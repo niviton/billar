@@ -157,6 +157,7 @@ class AppSettings(models.Model):
     background_color = models.CharField(max_length=20, default='#f8f9fa', verbose_name='Cor de Fundo')
     text_color = models.CharField(max_length=20, default='#1e293b', verbose_name='Cor do Texto')
     pix_key = models.CharField(max_length=200, blank=True, verbose_name='Chave PIX')
+    is_store_open = models.BooleanField(default=True, verbose_name='Loja Aberta')
 
     class Meta:
         verbose_name = 'Configurações'

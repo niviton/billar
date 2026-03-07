@@ -17,8 +17,10 @@
         <div>
             <h2 class="text-xl font-black tracking-tight text-slate-800 leading-none">{{ app_settings.store_name }}</h2>
             <div class="flex items-center gap-2 mt-1">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Salão</span>
+                <span class="w-2 h-2 rounded-full {% if app_settings.is_store_open %}bg-emerald-500 animate-pulse{% else %}bg-red-500{% endif %}"></span>
+                <span class="text-[10px] font-bold {% if app_settings.is_store_open %}text-slate-400{% else %}text-red-500{% endif %} uppercase tracking-widest">
+                    {% if app_settings.is_store_open %}Salao aberto{% else %}Loja fechada{% endif %}
+                </span>
             </div>
         </div>
     </div>
@@ -172,13 +174,17 @@
                         </div>
                     </div>
                 </div>
+            </form>
             
             <!-- Produtos -->
             <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6 mt-6">
                 {% for category in categories %}
                     {% for product in category.products.all %}
-                    <a href="{% url 'add_to_cart' product.id %}" 
-                       class="group p-4 rounded-[2rem] border transition-all relative flex flex-col items-center text-center overflow-hidden {% if product.stock > 0 %}bg-white border-slate-200 hover:border-red-200 hover:shadow-xl hover:shadow-red-500/5 hover:-translate-y-1{% else %}bg-slate-100 border-transparent opacity-60 grayscale pointer-events-none{% endif %}">
+                          <button type="button"
+                              data-cart-action="add"
+                              data-product-id="{{ product.id }}"
+                              onclick="handleCartAction('add', '{{ product.id }}'); return false;"
+                              class="group p-4 rounded-[2rem] border transition-all relative flex flex-col items-center text-center overflow-hidden touch-manipulation {% if product.stock > 0 %}bg-white border-slate-200 hover:border-red-200 hover:shadow-xl hover:shadow-red-500/5 hover:-translate-y-1 cursor-pointer{% else %}bg-slate-100 border-transparent opacity-60 grayscale pointer-events-none{% endif %}">
                         <div class="w-20 h-20 lg:w-24 lg:h-24 mb-4 rounded-full overflow-hidden flex items-center justify-center bg-slate-50 shadow-inner group-hover:scale-110 transition-transform duration-300">
                             {% if product.image %}
                             <img src="{{ product.image.url }}" alt="{{ product.name }}" class="w-full h-full object-cover" />
@@ -194,7 +200,8 @@
                                 {{ product.stock }}
                             </span>
                         </div>
-                    </a>
+                        <span class="mt-3 w-full py-2 rounded-xl text-xs font-bold uppercase tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-100">Adicionar</span>
+                    </button>
                     {% endfor %}
                 {% endfor %}
             </div>
@@ -206,15 +213,13 @@
                 <div class="flex items-center justify-between mb-6 pb-6 border-b border-slate-100">
                     <h3 class="text-lg font-black text-slate-800">Pedido Atual</h3>
                     <div class="flex gap-2">
-                        {% if cart %}
-                        <a href="{% url 'clear_cart' %}" class="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-red-50 hover:text-red-600 transition-all">
+                        <button id="clearCartBtn" type="button" class="p-2 bg-slate-100 text-slate-400 rounded-xl hover:bg-red-50 hover:text-red-600 transition-all {% if not cart %}hidden{% endif %}">
                             <i class="bi bi-trash text-lg"></i>
-                        </a>
-                        {% endif %}
+                        </button>
                     </div>
                 </div>
                 
-                <div class="flex-1 overflow-y-auto custom-scrollbar min-h-[200px]">
+                <div id="cartItemsContainer" class="flex-1 overflow-y-auto custom-scrollbar min-h-[200px]">
                     {% if cart %}
                         {% for item in cart %}
                         <div class="flex items-center gap-3 py-3 border-b border-slate-50">
@@ -230,13 +235,13 @@
                                 <p class="text-slate-400 text-xs">R$ {{ item.price }} × {{ item.qty }}</p>
                             </div>
                             <div class="flex items-center gap-1">
-                                <a href="{% url 'remove_from_cart' item.id %}" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all">
+                                <button type="button" data-cart-action="remove" data-product-id="{{ item.id }}" onclick="handleCartAction('remove', '{{ item.id }}'); return false;" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all touch-manipulation">
                                     <i class="bi bi-dash"></i>
-                                </a>
+                                </button>
                                 <span class="w-8 text-center font-bold text-slate-800">{{ item.qty }}</span>
-                                <a href="{% url 'add_to_cart' item.id %}" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-600 transition-all">
+                                <button type="button" data-cart-action="add" data-product-id="{{ item.id }}" onclick="handleCartAction('add', '{{ item.id }}'); return false;" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-600 transition-all touch-manipulation">
                                     <i class="bi bi-plus"></i>
-                                </a>
+                                </button>
                             </div>
                         </div>
                         {% endfor %}
@@ -251,18 +256,15 @@
                     {% endif %}
                 </div>
                 
-                {% if cart %}
-                <div class="mt-6 pt-6 border-t border-slate-100">
+                <div id="cartFooter" class="mt-6 pt-6 border-t border-slate-100 {% if not cart %}hidden{% endif %}">
                     <div class="flex items-center justify-between mb-6">
                         <span class="text-slate-500 font-medium">Total</span>
-                        <span class="text-2xl font-black text-slate-800">R$ {{ cart_total|floatformat:2 }}</span>
+                        <span id="cartTotalValue" class="text-2xl font-black text-slate-800">R$ {{ cart_total|floatformat:2|default:'0.00' }}</span>
                     </div>
                     <button type="submit" form="orderForm" class="w-full py-4 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-2xl font-bold shadow-lg hover:shadow-red-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all">
                         <i class="bi bi-send me-2"></i>Enviar Pedido
                     </button>
                 </div>
-                {% endif %}
-                </form>
             </div>
         </div>
     </div>
@@ -271,10 +273,132 @@
 
 {% block extra_js %}
 <script>
+const cartApi = {
+    add: "{% url 'api_add_to_cart' 0 %}",
+    remove: "{% url 'api_remove_from_cart' 0 %}",
+    clear: "{% url 'api_clear_cart' %}",
+};
+
 function toggleOrderType() {
     const isDineIn = document.querySelector('input[name="order_type"]:checked').value === 'dine-in';
     document.getElementById('dineInFields').classList.toggle('hidden', !isDineIn);
     document.getElementById('deliveryFields').classList.toggle('hidden', isDineIn);
+}
+
+function formatCurrency(value) {
+    return `R$ ${Number(value || 0).toFixed(2)}`;
+}
+
+function cartEndpoint(template, productId) {
+    return template.replace('/0/', `/${productId}/`);
+}
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+}
+
+function getCsrfToken() {
+    return getCookie('csrftoken') || document.querySelector('#orderForm input[name="csrfmiddlewaretoken"]')?.value || '';
+}
+
+function cartItemHtml(item) {
+    const media = item.image
+        ? `<img src="${item.image}" class="w-full h-full object-cover" />`
+        : `<span class="text-2xl">${item.icon || '🍔'}</span>`;
+
+    return `
+        <div class="flex items-center gap-3 py-3 border-b border-slate-50">
+            <div class="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center bg-slate-50">
+                ${media}
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-slate-800 text-sm truncate">${item.name}</p>
+                <p class="text-slate-400 text-xs">R$ ${Number(item.price).toFixed(2)} x ${item.qty}</p>
+            </div>
+            <div class="flex items-center gap-1">
+                <button type="button" data-cart-action="remove" data-product-id="${item.id}" onclick="handleCartAction('remove', '${item.id}'); return false;" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all">
+                    <i class="bi bi-dash"></i>
+                </button>
+                <span class="w-8 text-center font-bold text-slate-800">${item.qty}</span>
+                <button type="button" data-cart-action="add" data-product-id="${item.id}" onclick="handleCartAction('add', '${item.id}'); return false;" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-600 transition-all">
+                    <i class="bi bi-plus"></i>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function renderCart(cart, total) {
+    const cartItemsContainer = document.getElementById('cartItemsContainer');
+    const cartFooter = document.getElementById('cartFooter');
+    const cartTotalValue = document.getElementById('cartTotalValue');
+    const clearCartBtn = document.getElementById('clearCartBtn');
+
+    if (!cartItemsContainer || !cartFooter || !cartTotalValue || !clearCartBtn) {
+        return;
+    }
+
+    if (!cart || cart.length === 0) {
+        cartItemsContainer.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+                <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                    <i class="bi bi-cart-x text-3xl text-slate-300"></i>
+                </div>
+                <p class="font-bold text-slate-400">Carrinho vazio</p>
+                <p class="text-sm text-slate-300">Clique nos produtos para adicionar</p>
+            </div>
+        `;
+        cartFooter.classList.add('hidden');
+        clearCartBtn.classList.add('hidden');
+        cartTotalValue.textContent = formatCurrency(0);
+        return;
+    }
+
+    cartItemsContainer.innerHTML = cart.map(cartItemHtml).join('');
+    cartTotalValue.textContent = formatCurrency(total);
+    cartFooter.classList.remove('hidden');
+    clearCartBtn.classList.remove('hidden');
+}
+
+async function postCart(url) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error('Falha na atualização do carrinho.');
+    }
+
+    return response.json();
+}
+
+async function handleCartAction(action, productId) {
+    try {
+        let data;
+
+        if (action === 'clear') {
+            data = await postCart(cartApi.clear);
+        } else {
+            const endpoint = action === 'add' ? cartApi.add : cartApi.remove;
+            data = await postCart(cartEndpoint(endpoint, productId));
+        }
+
+        if (!data.success) {
+            return;
+        }
+
+        const total = data.total ?? data.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        renderCart(data.cart, total);
+    } catch (error) {
+        console.error(error);
+    }
 }
 
 function saveWaiterDraft() {
@@ -352,6 +476,42 @@ document.addEventListener('DOMContentLoaded', function() {
             localStorage.removeItem('waiterOrderDraft');
         });
     }
+
+    const initialCart = [
+        {% for item in cart %}
+        {
+            id: {{ item.id }},
+            name: "{{ item.name|escapejs }}",
+            price: {{ item.price }},
+            qty: {{ item.qty }},
+            icon: "{{ item.icon|default:'🍔'|escapejs }}",
+            image: {% if item.image %}"{{ item.image|escapejs }}"{% else %}null{% endif %}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    renderCart(initialCart, {{ cart_total|default:0 }});
+
+    const clearCartBtn = document.getElementById('clearCartBtn');
+    if (clearCartBtn) {
+        clearCartBtn.addEventListener('click', function() {
+            handleCartAction('clear');
+        });
+        clearCartBtn.addEventListener('touchend', function(event) {
+            event.preventDefault();
+            handleCartAction('clear');
+        }, { passive: false });
+    }
+
+    document.querySelectorAll('[data-cart-action]').forEach(function(element) {
+        element.addEventListener('touchend', function(event) {
+            event.preventDefault();
+            const action = element.dataset.cartAction;
+            const productId = element.dataset.productId;
+            if (action === 'add' || action === 'remove') {
+                handleCartAction(action, productId);
+            }
+        }, { passive: false });
+    });
 });
 </script>
 {% endblock %}

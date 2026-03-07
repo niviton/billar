@@ -4,10 +4,11 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
 from django.db.models import Sum, Count, Avg
 from django.db.models.functions import TruncDay, TruncWeek, TruncMonth
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, date
 import json
 
 from .models import User, Category, Product, Order, OrderItem, AppSettings
@@ -17,6 +18,7 @@ from .forms import (
 )
 
 
+@never_cache
 def login_view(request):
     """View de login"""
     if request.user.is_authenticated:
@@ -56,6 +58,13 @@ def dashboard(request):
         return redirect('kitchen_view')
 
 
+def redirect_order_entry(request):
+    """Redireciona para a tela de criação de pedidos conforme o perfil."""
+    if request.user.role == 'gerente':
+        return redirect('admin_online_orders')
+    return redirect('waiter_view')
+
+
 # ============== GARÇOM VIEWS ==============
 
 @login_required
@@ -86,7 +95,7 @@ def add_to_cart(request, product_id):
     
     if product.stock <= 0:
         messages.error(request, 'Produto sem estoque')
-        return redirect('waiter_view')
+        return redirect_order_entry(request)
     
     cart = request.session.get('cart', [])
     
@@ -95,10 +104,10 @@ def add_to_cart(request, product_id):
         if item['id'] == product_id:
             if item['qty'] >= product.stock:
                 messages.error(request, 'Limite de estoque atingido')
-                return redirect('waiter_view')
+                return redirect_order_entry(request)
             item['qty'] += 1
             request.session['cart'] = cart
-            return redirect('waiter_view')
+            return redirect_order_entry(request)
     
     # Adicionar novo item
     cart.append({
@@ -110,7 +119,7 @@ def add_to_cart(request, product_id):
         'image': product.image.url if product.image else None,
     })
     request.session['cart'] = cart
-    return redirect('waiter_view')
+    return redirect_order_entry(request)
 
 
 @login_required
@@ -127,7 +136,7 @@ def remove_from_cart(request, product_id):
             break
     
     request.session['cart'] = cart
-    return redirect('waiter_view')
+    return redirect_order_entry(request)
 
 
 @login_required
@@ -135,18 +144,23 @@ def clear_cart(request):
     """Limpar carrinho"""
     request.session['cart'] = []
     messages.info(request, 'Carrinho limpo')
-    return redirect('waiter_view')
+    return redirect_order_entry(request)
 
 
 @login_required
 def submit_order(request):
     """Enviar pedido"""
     if request.method == 'POST':
+        settings = AppSettings.get_settings()
+        if not settings.is_store_open:
+            messages.error(request, 'Loja fechada no momento. Aguarde o gerente abrir novamente.')
+            return redirect_order_entry(request)
+
         cart = request.session.get('cart', [])
         
         if not cart:
             messages.error(request, '❌ O carrinho está vazio')
-            return redirect('waiter_view')
+            return redirect_order_entry(request)
         
         mesa = request.POST.get('mesa', '').strip()
         cliente = request.POST.get('cliente', '').strip() or 'Cliente'
@@ -156,7 +170,7 @@ def submit_order(request):
         
         if order_type == 'dine-in' and not mesa:
             messages.error(request, '❌ Informe o número da mesa')
-            return redirect('waiter_view')
+            return redirect_order_entry(request)
         
         if order_type == 'delivery':
             mesa = 'DELIVERY'
@@ -164,7 +178,7 @@ def submit_order(request):
             cliente = f"[{platform}] {cliente}"
             if not address:
                 messages.error(request, '❌ Informe o endereço de entrega')
-                return redirect('waiter_view')
+                return redirect_order_entry(request)
         
         try:
             # Verificar se já existe pedido ativo para a mesa
@@ -231,13 +245,13 @@ def submit_order(request):
             
             # Limpar carrinho
             request.session['cart'] = []
-            return redirect('waiter_view')
+            return redirect_order_entry(request)
         
         except Exception as e:
             messages.error(request, f'❌ Erro ao enviar pedido: {str(e)}')
-            return redirect('waiter_view')
+            return redirect_order_entry(request)
     
-    return redirect('waiter_view')
+    return redirect_order_entry(request)
 
 
 # ============== COZINHA VIEWS ==============
@@ -343,23 +357,52 @@ def admin_reports(request):
     """Relatórios"""
     if request.user.role != 'gerente':
         return redirect('dashboard')
-    
-    period = request.GET.get('period', 'day')
-    today = timezone.now().date()
-    
-    if period == 'day':
-        start_date = today
-    elif period == 'week':
-        start_date = today - timedelta(days=7)
-    elif period == 'month':
-        start_date = today - timedelta(days=30)
-    else:  # year
-        start_date = today - timedelta(days=365)
-    
-    orders = Order.objects.filter(
-        created_at__date__gte=start_date,
-        status='finalizado'
-    )
+
+    today = timezone.localdate()
+    filter_type = request.GET.get('filter', 'day')
+
+    selected_day = request.GET.get('day') or today.strftime('%Y-%m-%d')
+    selected_month = request.GET.get('month') or today.strftime('%Y-%m')
+    selected_year = request.GET.get('year') or str(today.year)
+
+    orders = Order.objects.filter(status='finalizado')
+
+    if filter_type == 'day':
+        try:
+            year, month, day = [int(part) for part in selected_day.split('-')]
+            target_day = date(year, month, day)
+        except (TypeError, ValueError):
+            target_day = today
+            selected_day = today.strftime('%Y-%m-%d')
+        orders = orders.filter(created_at__date=target_day)
+
+    elif filter_type == 'month':
+        try:
+            year, month = [int(part) for part in selected_month.split('-')]
+            start_month = date(year, month, 1)
+        except (TypeError, ValueError):
+            start_month = date(today.year, today.month, 1)
+            selected_month = today.strftime('%Y-%m')
+
+        if start_month.month == 12:
+            next_month = date(start_month.year + 1, 1, 1)
+        else:
+            next_month = date(start_month.year, start_month.month + 1, 1)
+
+        orders = orders.filter(created_at__date__gte=start_month, created_at__date__lt=next_month)
+
+    elif filter_type == 'year':
+        try:
+            target_year = int(selected_year)
+        except (TypeError, ValueError):
+            target_year = today.year
+            selected_year = str(today.year)
+        orders = orders.filter(created_at__year=target_year)
+
+    else:
+        filter_type = 'day'
+        orders = orders.filter(created_at__date=today)
+        selected_day = today.strftime('%Y-%m-%d')
     
     # Estatísticas
     total_revenue = orders.aggregate(total=Sum('total'))['total'] or 0
@@ -391,7 +434,11 @@ def admin_reports(request):
     ).order_by('-total_qty')[:10]
     
     context = {
-        'period': period,
+        'filter_type': filter_type,
+        'selected_day': selected_day,
+        'selected_month': selected_month,
+        'selected_year': selected_year,
+        'year_options': range(today.year - 5, today.year + 1),
         'total_revenue': total_revenue,
         'total_orders': total_orders,
         'ticket_medio': avg_ticket,
@@ -401,6 +448,29 @@ def admin_reports(request):
         'active_menu': 'reports',
     }
     return render(request, 'restaurante/admin/reports.html', context)
+
+
+@login_required
+@require_POST
+def toggle_store_status(request):
+    """Alterna status da loja (aberta/fechada) no painel do gerente."""
+    if request.user.role != 'gerente':
+        messages.error(request, 'Apenas gerentes podem alterar o status da loja.')
+        return redirect('dashboard')
+
+    settings = AppSettings.get_settings()
+    settings.is_store_open = not settings.is_store_open
+    settings.save(update_fields=['is_store_open'])
+
+    if settings.is_store_open:
+        messages.success(request, 'Loja aberta com sucesso.')
+    else:
+        messages.warning(request, 'Loja fechada para novos pedidos.')
+
+    next_url = request.POST.get('next')
+    if next_url:
+        return redirect(next_url)
+    return redirect('admin_dashboard')
 
 
 @login_required
@@ -482,6 +552,7 @@ def category_create(request):
             form.save()
             messages.success(request, 'Categoria criada!')
             return redirect('admin_menu')
+        messages.error(request, 'Não foi possível criar a categoria. Verifique os dados.')
     else:
         form = CategoryForm()
     
@@ -502,6 +573,7 @@ def category_edit(request, category_id):
             form.save()
             messages.success(request, 'Categoria atualizada!')
             return redirect('admin_menu')
+        messages.error(request, 'Não foi possível atualizar a categoria. Verifique os dados.')
     else:
         form = CategoryForm(instance=category)
 
@@ -802,3 +874,14 @@ def api_get_cart(request):
     cart = request.session.get('cart', [])
     total = sum(item['price'] * item['qty'] for item in cart)
     return JsonResponse({'cart': cart, 'total': total})
+
+
+@login_required
+def api_clear_cart(request):
+    """API: Limpar carrinho"""
+    if request.method == 'POST':
+        request.session['cart'] = []
+        request.session.modified = True
+        return JsonResponse({'success': True, 'cart': [], 'total': 0})
+
+    return JsonResponse({'success': False})

@@ -36,11 +36,9 @@ class CategoryForm(forms.ModelForm):
     """Formulário de categoria"""
     class Meta:
         model = Category
-        fields = ['name', 'icon', 'order']
+        fields = ['name']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'icon': forms.TextInput(attrs={'class': 'form-control', 'maxlength': '10'}),
-            'order': forms.NumberInput(attrs={'class': 'form-control'}),
         }
 
 

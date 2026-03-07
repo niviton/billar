@@ -27,6 +27,9 @@
         <div>
             <h1 class="text-2xl font-black text-white">Cozinha</h1>
             <p class="text-white/70 text-sm">{{ app_settings.store_name }}</p>
+            <p class="text-xs font-bold uppercase tracking-widest {% if app_settings.is_store_open %}text-emerald-100{% else %}text-red-100{% endif %}">
+                {% if app_settings.is_store_open %}Loja aberta{% else %}Loja fechada{% endif %}
+            </p>
         </div>
     </div>
     <div class="flex items-center gap-6">
@@ -143,7 +146,7 @@
     updateTime();
     setInterval(updateTime, 1000);
     
-    // Auto-refresh a cada 30 segundos
-    setTimeout(() => location.reload(), 30000);
+    // Auto-refresh da cozinha a cada 3 segundos
+    setInterval(() => location.reload(), 3000);
 </script>
 {% endblock %}

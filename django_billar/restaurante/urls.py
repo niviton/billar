@@ -40,6 +40,7 @@ urlpatterns = [
     
     # Admin - Configurações
     path('admin-panel/settings/', views.admin_settings, name='admin_settings'),
+    path('admin-panel/store/toggle/', views.toggle_store_status, name='toggle_store_status'),
     
     # Admin - Pedidos Online
     path('admin-panel/online/', views.admin_online_orders, name='admin_online_orders'),
@@ -53,4 +54,5 @@ urlpatterns = [
     path('api/cart/add/<int:product_id>/', views.api_add_to_cart, name='api_add_to_cart'),
     path('api/cart/remove/<int:product_id>/', views.api_remove_from_cart, name='api_remove_from_cart'),
     path('api/cart/', views.api_get_cart, name='api_get_cart'),
+    path('api/cart/clear/', views.api_clear_cart, name='api_clear_cart'),
 ]
