@@ -426,8 +426,7 @@ def admin_reports(request):
     
     # Produtos mais vendidos
     top_products = OrderItem.objects.filter(
-        order__created_at__date__gte=start_date,
-        order__status='finalizado'
+        order__in=orders
     ).values('product__name', 'product__icon').annotate(
         total_qty=Sum('quantity'),
         total_revenue=Sum('quantity') * Avg('unit_price')
