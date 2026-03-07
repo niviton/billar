@@ -111,17 +111,21 @@ class AppSettingsForm(forms.ModelForm):
     """Formulário de configurações"""
     class Meta:
         model = AppSettings
-        fields = ['store_name', 'slogan', 'logo', 'font', 'font_size', 
-                  'primary_color', 'secondary_color', 'background_color', 'text_color', 'pix_key']
+        fields = [
+            'store_name',
+            'slogan',
+            'logo',
+            'primary_color',
+            'secondary_color',
+            'background_color',
+            'text_color',
+        ]
         widgets = {
             'store_name': forms.TextInput(attrs={'class': 'form-control'}),
             'slogan': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
             'logo': forms.FileInput(attrs={'class': 'form-control'}),
-            'font': forms.TextInput(attrs={'class': 'form-control'}),
-            'font_size': forms.NumberInput(attrs={'class': 'form-control'}),
             'primary_color': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
             'secondary_color': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
             'background_color': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
             'text_color': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
-            'pix_key': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Chave PIX'}),
         }

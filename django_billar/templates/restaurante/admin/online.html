@@ -174,7 +174,7 @@ function onlineGetCookie(name) {
 }
 
 function onlineGetCsrfToken() {
-    return onlineGetCookie('csrftoken') || document.querySelector('#onlineOrderForm input[name="csrfmiddlewaretoken"]')?.value || '';
+    return document.querySelector('#onlineOrderForm input[name="csrfmiddlewaretoken"]')?.value || onlineGetCookie('csrftoken') || '';
 }
 
 function onlineCartItemHtml(item) {

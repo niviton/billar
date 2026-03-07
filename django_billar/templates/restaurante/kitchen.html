@@ -70,9 +70,14 @@
                 <div class="flex justify-between items-start mb-4">
                     <div>
                         {% if order.order_type == 'delivery' %}
-                        <span class="inline-block px-3 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full text-white text-xs font-bold mb-2">
+                        <span class="inline-block px-3 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full text-white text-xs font-bold mb-2 mr-2">
                             🛵 DELIVERY
                         </span>
+                        {% if order.platform_name %}
+                        <span class="inline-block px-3 py-1 bg-indigo-900/70 border border-indigo-400/40 rounded-full text-indigo-100 text-xs font-bold mb-2">
+                            <i class="bi bi-phone me-1"></i>{{ order.platform_name }}
+                        </span>
+                        {% endif %}
                         {% endif %}
                         <h3 class="text-2xl font-black text-white">Mesa {{ order.mesa }}</h3>
                         <p class="text-slate-400">{{ order.cliente }}</p>
@@ -81,27 +86,27 @@
                         <div class="px-3 py-1 bg-white/10 rounded-full text-white text-sm font-bold {% if order.is_late %}bg-red-500/30{% endif %}">
                             <i class="bi bi-clock me-1"></i>{{ order.wait_minutes }} min
                         </div>
-                        <p class="text-slate-500 text-sm mt-1">{{ order.created_at|time:"H:i" }}</p>
+                        <p class="text-slate-500 text-sm mt-1">{{ order.kitchen_reference_time|time:"H:i" }}</p>
                     </div>
                 </div>
                 
                 <!-- Itens -->
                 <div class="bg-black/30 rounded-2xl p-4 mb-4">
-                    {% for item in order.items.all %}
+                    {% for item in order.pending_items %}
                     <div class="flex items-center gap-3 py-2 {% if not forloop.last %}border-b border-white/10{% endif %}">
                         <span class="text-xl">{{ item.product.icon|default:"🍔" }}</span>
-                        <span class="text-amber-400 font-black text-lg">{{ item.quantity }}×</span>
+                        <span class="text-amber-400 font-black text-lg">{{ item.pending_quantity }}×</span>
                         <span class="text-white font-medium">{{ item.product.name }}</span>
                     </div>
                     {% endfor %}
                 </div>
                 
-                {% if order.observacoes %}
+                {% if order.display_observacoes %}
                 <div class="bg-amber-500/20 border border-amber-500/50 rounded-xl px-4 py-3 mb-4 flex items-start gap-2">
                     <i class="bi bi-chat-left-text text-amber-400 mt-0.5"></i>
                     <div>
                         <span class="text-amber-400 font-bold text-sm">Observações:</span>
-                        <p class="text-amber-200 text-sm">{{ order.observacoes }}</p>
+                        <p class="text-amber-200 text-sm">{{ order.display_observacoes }}</p>
                     </div>
                 </div>
                 {% endif %}

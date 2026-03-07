@@ -49,6 +49,10 @@ urlpatterns = [
     path('order/<int:order_id>/close/', views.close_order, name='close_order'),
     path('order/<int:order_id>/cancel/', views.cancel_order, name='cancel_order'),
     path('order/<int:order_id>/print/', views.print_order, name='print_order'),
+    path('order/<int:order_id>/manage/', views.manage_order, name='manage_order'),
+    path('order/<int:order_id>/update/', views.update_order_info, name='update_order_info'),
+    path('order/<int:order_id>/item/<int:item_id>/change/', views.change_order_item_qty, name='change_order_item_qty'),
+    path('order/<int:order_id>/item/add/<int:product_id>/', views.add_product_to_order, name='add_product_to_order'),
     
     # API (AJAX)
     path('api/cart/add/<int:product_id>/', views.api_add_to_cart, name='api_add_to_cart'),

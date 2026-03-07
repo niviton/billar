@@ -18,6 +18,29 @@ from .forms import (
 )
 
 
+def enrich_delivery_order_display(order):
+    """Extrai plataforma de delivery das observações para exibição em badge."""
+    order.platform_name = ''
+    order.display_observacoes = order.observacoes
+
+    if order.order_type != 'delivery' or not order.observacoes:
+        return
+
+    prefix = 'Plataforma:'
+    raw_observacoes = order.observacoes.strip()
+    if not raw_observacoes.startswith(prefix):
+        return
+
+    after_prefix = raw_observacoes[len(prefix):].strip()
+    if '|' in after_prefix:
+        platform, remaining_obs = after_prefix.split('|', 1)
+        order.platform_name = platform.strip()
+        order.display_observacoes = remaining_obs.strip()
+    else:
+        order.platform_name = after_prefix.strip()
+        order.display_observacoes = ''
+
+
 @never_cache
 def login_view(request):
     """View de login"""
@@ -52,10 +75,10 @@ def dashboard(request):
     user = request.user
     if user.role == 'gerente':
         return redirect('admin_dashboard')
-    elif user.role == 'garcom':
-        return redirect('waiter_view')
-    else:  # cozinha
+    elif user.role == 'cozinha':
         return redirect('kitchen_view')
+    else:
+        return redirect('waiter_view')
 
 
 def redirect_order_entry(request):
@@ -167,6 +190,7 @@ def submit_order(request):
         observacoes = request.POST.get('observacoes', '').strip()
         order_type = request.POST.get('order_type', 'dine-in')
         address = request.POST.get('address', '').strip()
+        platform_note = ''
         
         if order_type == 'dine-in' and not mesa:
             messages.error(request, '❌ Informe o número da mesa')
@@ -175,10 +199,13 @@ def submit_order(request):
         if order_type == 'delivery':
             mesa = 'DELIVERY'
             platform = request.POST.get('platform', 'Whatsapp')
-            cliente = f"[{platform}] {cliente}"
+            platform_note = f"Plataforma: {platform}"
             if not address:
                 messages.error(request, '❌ Informe o endereço de entrega')
                 return redirect_order_entry(request)
+
+        if platform_note:
+            observacoes = f"{platform_note} | {observacoes}" if observacoes else platform_note
         
         try:
             # Verificar se já existe pedido ativo para a mesa
@@ -197,12 +224,14 @@ def submit_order(request):
                     
                     if existing_item:
                         existing_item.quantity += cart_item['qty']
+                        existing_item.pending_quantity += cart_item['qty']
                         existing_item.save()
                     else:
                         OrderItem.objects.create(
                             order=active_order,
                             product=product,
                             quantity=cart_item['qty'],
+                            pending_quantity=cart_item['qty'],
                             unit_price=product.price
                         )
                     
@@ -214,6 +243,7 @@ def submit_order(request):
                 if observacoes:
                     active_order.observacoes = (active_order.observacoes + " | " + observacoes) if active_order.observacoes else observacoes
                 active_order.calculate_total()
+                sync_order_kitchen_status(active_order)
                 messages.success(request, f'✅ Pedido atualizado para mesa {mesa}')
             else:
                 # Criar novo pedido
@@ -235,6 +265,7 @@ def submit_order(request):
                         order=order,
                         product=product,
                         quantity=cart_item['qty'],
+                        pending_quantity=cart_item['qty'],
                         unit_price=product.price
                     )
                     # Atualizar estoque
@@ -254,6 +285,246 @@ def submit_order(request):
     return redirect_order_entry(request)
 
 
+def redirect_by_role(request):
+    """Redireciona para a tela principal conforme função do usuário."""
+    if request.user.role == 'gerente':
+        return redirect('admin_dashboard')
+    if request.user.role == 'cozinha':
+        return redirect('kitchen_view')
+    return redirect('waiter_view')
+
+
+def can_manage_order(user):
+    return user.role != 'cozinha'
+
+
+def is_ajax_request(request):
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+
+def order_snapshot(order):
+    order_items = order.items.select_related('product').all().order_by('id')
+    return {
+        'id': order.id,
+        'mesa': order.mesa,
+        'cliente': order.cliente,
+        'observacoes': order.observacoes or '',
+        'total': float(order.total),
+        'items': [
+            {
+                'id': item.id,
+                'product_name': item.product.name,
+                'product_icon': item.product.icon or '🍔',
+                'quantity': item.quantity,
+                'pending_quantity': item.pending_quantity,
+                'unit_price': float(item.unit_price),
+                'subtotal': float(item.subtotal),
+            }
+            for item in order_items
+        ]
+    }
+
+
+def sync_order_kitchen_status(order):
+    """Mantém status baseado no que ainda falta preparar na cozinha."""
+    if order.status in ['finalizado', 'cancelado']:
+        return
+
+    has_pending_items = order.items.filter(pending_quantity__gt=0).exists()
+    target_status = 'cozinha' if has_pending_items else 'pronto'
+
+    if order.status != target_status:
+        order.status = target_status
+        order.save(update_fields=['status', 'updated_at'])
+
+
+@login_required
+def manage_order(request, order_id):
+    """Tela para gerente/garçom alterar pedido ativo e adicionar itens."""
+    if not can_manage_order(request.user):
+        messages.error(request, 'Acesso não autorizado')
+        return redirect_by_role(request)
+
+    order = get_object_or_404(Order.objects.prefetch_related('items__product'), id=order_id)
+
+    if order.status in ['finalizado', 'cancelado']:
+        messages.error(request, 'Não é possível alterar um pedido finalizado/cancelado.')
+        return redirect_by_role(request)
+
+    categories = Category.objects.prefetch_related('products').all()
+    context = {
+        'order': order,
+        'categories': categories,
+    }
+    return render(request, 'restaurante/manage_order.html', context)
+
+
+@login_required
+@require_POST
+def update_order_info(request, order_id):
+    """Atualiza dados principais do pedido ativo."""
+    if not can_manage_order(request.user):
+        messages.error(request, 'Acesso não autorizado')
+        return redirect_by_role(request)
+
+    order = get_object_or_404(Order, id=order_id)
+    if order.status in ['finalizado', 'cancelado']:
+        messages.error(request, 'Pedido não pode mais ser alterado.')
+        return redirect_by_role(request)
+
+    mesa = request.POST.get('mesa', '').strip()
+    cliente = request.POST.get('cliente', '').strip() or 'Cliente'
+    observacoes = request.POST.get('observacoes', '').strip()
+
+    if order.order_type == 'dine-in' and not mesa:
+        if is_ajax_request(request):
+            return JsonResponse({'success': False, 'message': 'Informe o número da mesa.'}, status=400)
+        messages.error(request, 'Informe o número da mesa.')
+        return redirect('manage_order', order_id=order.id)
+
+    if order.order_type == 'delivery':
+        mesa = 'DELIVERY'
+
+    order.mesa = mesa
+    order.cliente = cliente
+    order.observacoes = observacoes
+    order.save(update_fields=['mesa', 'cliente', 'observacoes', 'updated_at'])
+    sync_order_kitchen_status(order)
+
+    if is_ajax_request(request):
+        return JsonResponse({
+            'success': True,
+            'message': 'Dados do pedido atualizados.',
+            'order': order_snapshot(order)
+        })
+
+    messages.success(request, 'Dados do pedido atualizados.')
+    return redirect('manage_order', order_id=order.id)
+
+
+@login_required
+@require_POST
+def add_product_to_order(request, order_id, product_id):
+    """Adiciona item ao pedido existente (mesa)."""
+    if not can_manage_order(request.user):
+        messages.error(request, 'Acesso não autorizado')
+        return redirect_by_role(request)
+
+    order = get_object_or_404(Order, id=order_id)
+    product = get_object_or_404(Product, id=product_id)
+
+    if order.status in ['finalizado', 'cancelado']:
+        if is_ajax_request(request):
+            return JsonResponse({'success': False, 'message': 'Pedido não pode mais ser alterado.'}, status=400)
+        messages.error(request, 'Pedido não pode mais ser alterado.')
+        return redirect('manage_order', order_id=order.id)
+
+    if product.stock <= 0:
+        if is_ajax_request(request):
+            return JsonResponse({'success': False, 'message': 'Produto sem estoque.'}, status=400)
+        messages.error(request, 'Produto sem estoque.')
+        return redirect('manage_order', order_id=order.id)
+
+    order_item = order.items.filter(product=product).first()
+    if order_item:
+        order_item.quantity += 1
+        order_item.pending_quantity += 1
+        order_item.save()
+    else:
+        OrderItem.objects.create(
+            order=order,
+            product=product,
+            quantity=1,
+            pending_quantity=1,
+            unit_price=product.price
+        )
+
+    product.stock -= 1
+    product.save(update_fields=['stock'])
+    order.calculate_total()
+    sync_order_kitchen_status(order)
+
+    if is_ajax_request(request):
+        order.refresh_from_db()
+        return JsonResponse({
+            'success': True,
+            'message': f'{product.name} adicionado ao pedido.',
+            'order': order_snapshot(order)
+        })
+
+    messages.success(request, f'{product.name} adicionado ao pedido.')
+    return redirect('manage_order', order_id=order.id)
+
+
+@login_required
+@require_POST
+def change_order_item_qty(request, order_id, item_id):
+    """Incrementa/decrementa/remove item de um pedido ativo."""
+    if not can_manage_order(request.user):
+        messages.error(request, 'Acesso não autorizado')
+        return redirect_by_role(request)
+
+    order = get_object_or_404(Order, id=order_id)
+    order_item = get_object_or_404(OrderItem, id=item_id, order=order)
+
+    if order.status in ['finalizado', 'cancelado']:
+        if is_ajax_request(request):
+            return JsonResponse({'success': False, 'message': 'Pedido não pode mais ser alterado.'}, status=400)
+        messages.error(request, 'Pedido não pode mais ser alterado.')
+        return redirect('manage_order', order_id=order.id)
+
+    action = request.POST.get('action')
+    product = order_item.product
+
+    if action == 'add':
+        if product.stock <= 0:
+            if is_ajax_request(request):
+                return JsonResponse({'success': False, 'message': 'Produto sem estoque.'}, status=400)
+            messages.error(request, 'Produto sem estoque.')
+            return redirect('manage_order', order_id=order.id)
+        order_item.quantity += 1
+        order_item.pending_quantity += 1
+        product.stock -= 1
+        order_item.save(update_fields=['quantity', 'pending_quantity'])
+        product.save(update_fields=['stock'])
+
+    elif action == 'remove':
+        order_item.quantity -= 1
+        if order_item.pending_quantity > 0:
+            order_item.pending_quantity -= 1
+        product.stock += 1
+        if order_item.quantity <= 0:
+            order_item.delete()
+        else:
+            order_item.save(update_fields=['quantity', 'pending_quantity'])
+        product.save(update_fields=['stock'])
+
+    elif action == 'delete':
+        product.stock += order_item.quantity
+        product.save(update_fields=['stock'])
+        order_item.delete()
+
+    else:
+        if is_ajax_request(request):
+            return JsonResponse({'success': False, 'message': 'Ação inválida.'}, status=400)
+        messages.error(request, 'Ação inválida.')
+        return redirect('manage_order', order_id=order.id)
+
+    order.calculate_total()
+    sync_order_kitchen_status(order)
+
+    if is_ajax_request(request):
+        order.refresh_from_db()
+        return JsonResponse({
+            'success': True,
+            'message': 'Pedido atualizado.',
+            'order': order_snapshot(order)
+        })
+
+    messages.success(request, 'Pedido atualizado.')
+    return redirect('manage_order', order_id=order.id)
+
+
 # ============== COZINHA VIEWS ==============
 
 @login_required
@@ -262,16 +533,26 @@ def kitchen_view(request):
     now = timezone.now()
     threshold_time = now - timedelta(minutes=15)  # Pedidos com mais de 15 min
     
-    orders_cozinha = Order.objects.filter(status='cozinha').prefetch_related('items__product').order_by('created_at')
+    orders_cozinha_raw = Order.objects.filter(status='cozinha').prefetch_related('items__product').order_by('created_at')
     orders_pronto = Order.objects.filter(status='pronto').prefetch_related('items__product').order_by('created_at')
+
+    orders_cozinha = []
     
     # Adicionar flag de atrasado para cada pedido
-    for order in orders_cozinha:
-        order.is_late = order.created_at < threshold_time
-        order.wait_minutes = int((now - order.created_at).total_seconds() // 60)
+    for order in orders_cozinha_raw:
+        order.pending_items = [item for item in order.items.all() if item.pending_quantity > 0]
+        if not order.pending_items:
+            continue
+        # Para pedidos alterados/reenviados, o tempo deve contar da última atualização enviada para cozinha.
+        order.kitchen_reference_time = order.updated_at or order.created_at
+        order.is_late = order.kitchen_reference_time < threshold_time
+        order.wait_minutes = int((now - order.kitchen_reference_time).total_seconds() // 60)
+        enrich_delivery_order_display(order)
+        orders_cozinha.append(order)
     
     for order in orders_pronto:
         order.wait_minutes = int((now - order.created_at).total_seconds() // 60)
+        enrich_delivery_order_display(order)
     
     context = {
         'orders_cozinha': orders_cozinha,
@@ -286,6 +567,7 @@ def kitchen_view(request):
 def mark_order_ready(request, order_id):
     """Marcar pedido como pronto"""
     order = get_object_or_404(Order, id=order_id)
+    order.items.update(pending_quantity=0)
     order.status = 'pronto'
     order.save()
     messages.success(request, f'Pedido #{order.id} marcado como pronto!')
@@ -317,6 +599,9 @@ def admin_dashboard(request):
     active_orders = Order.objects.filter(
         status__in=['cozinha', 'pronto']
     ).prefetch_related('items__product').order_by('-created_at')
+
+    for order in active_orders:
+        enrich_delivery_order_display(order)
     
     # Mesas ativas (pedidos não finalizados, excluindo delivery)
     mesas_ativas = Order.objects.filter(
@@ -680,6 +965,7 @@ def admin_settings(request):
             form.save()
             messages.success(request, 'Configurações salvas!')
             return redirect('admin_settings')
+        messages.error(request, 'Não foi possível salvar. Verifique os campos e tente novamente.')
     else:
         form = AppSettingsForm(instance=settings)
     
@@ -709,10 +995,12 @@ def admin_online_orders(request):
             messages.error(request, 'Informe o nome do cliente')
             return redirect('admin_online_orders')
         
+        observacoes = f"Plataforma: {platform} | {observacoes}" if observacoes else f"Plataforma: {platform}"
+
         total = sum(item['price'] * item['qty'] for item in cart)
         order = Order.objects.create(
             mesa='DELIVERY',
-            cliente=f"[{platform}] {cliente}",
+            cliente=cliente,
             observacoes=observacoes,
             total=total,
             status='cozinha',
@@ -727,6 +1015,7 @@ def admin_online_orders(request):
                 order=order,
                 product=product,
                 quantity=cart_item['qty'],
+                pending_quantity=cart_item['qty'],
                 unit_price=product.price
             )
             product.stock -= cart_item['qty']

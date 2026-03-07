@@ -17,13 +17,38 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
-# Permite POST com CSRF quando a aplicação é aberta via HTTPS local (ex.: dev container/proxy)
+# Em desenvolvimento (localhost + Codespaces), aceitar variações de host/porta
+# evita falhas intermitentes de CSRF no login e nos POSTs AJAX.
 CSRF_TRUSTED_ORIGINS = [
+    'http://localhost',
+    'https://localhost',
+    'http://127.0.0.1',
+    'https://127.0.0.1',
     'http://localhost:8000',
     'https://localhost:8000',
     'http://127.0.0.1:8000',
     'https://127.0.0.1:8000',
+    'https://*.app.github.dev',
+    'https://*.githubpreview.dev',
 ]
+
+codespace_name = os.getenv('CODESPACE_NAME', '').strip()
+forward_domain = os.getenv('GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN', '').strip()
+if codespace_name and forward_domain:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{codespace_name}-*.{forward_domain}')
+
+# Em desenvolvimento, manter token CSRF por cookie é mais compatível com os
+# fluxos AJAX já existentes no projeto.
+CSRF_USE_SESSIONS = False
+
+# Ajustes para execução atrás do proxy HTTPS do Codespaces.
+if os.getenv('CODESPACES', '').lower() == 'true':
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST = True
+    # Compatível com acesso por localhost/http e também por URL https do Codespaces.
+    SECURE_SSL_REDIRECT = False
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SECURE = False
 
 # Application definition
 INSTALLED_APPS = [

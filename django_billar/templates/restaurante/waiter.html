@@ -56,6 +56,9 @@
                         <div class="text-left">
                             <p class="text-xs font-bold uppercase tracking-wide opacity-70">Mesa</p>
                             <p class="font-bold truncate max-w-[100px]">{{ order.cliente }}</p>
+                            <a href="{% url 'manage_order' order.id %}" class="inline-flex mt-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wide">
+                                Alterar pedido
+                            </a>
                         </div>
                         <span class="ml-auto px-2 py-1 text-xs font-bold rounded-full {% if order.status == 'cozinha' %}bg-amber-100 text-amber-700{% else %}bg-cyan-100 text-cyan-700{% endif %}">
                             {{ order.get_status_display }}
@@ -301,7 +304,7 @@ function getCookie(name) {
 }
 
 function getCsrfToken() {
-    return getCookie('csrftoken') || document.querySelector('#orderForm input[name="csrfmiddlewaretoken"]')?.value || '';
+    return document.querySelector('#orderForm input[name="csrfmiddlewaretoken"]')?.value || getCookie('csrftoken') || '';
 }
 
 function cartItemHtml(item) {
