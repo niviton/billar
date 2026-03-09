@@ -1,0 +1,344 @@
+{% extends 'restaurante/admin/base_admin.html' %}
+
+{% block title %}Pedidos Online - {{ app_settings.store_name }}{% endblock %}
+
+{% block admin_content %}
+<div class="max-w-[1400px] mx-auto">
+    <!-- Título -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-black text-slate-800">Pedidos Online</h1>
+        <p class="text-slate-500">Crie pedidos para delivery e retirada</p>
+    </div>
+    
+    <div class="grid grid-cols-12 gap-8">
+        <!-- Produtos -->
+        <div class="col-span-12 lg:col-span-8">
+            <form method="post" action="{% url 'submit_order' %}" id="onlineOrderForm">
+                {% csrf_token %}
+                <input type="hidden" name="order_type" value="delivery">
+                
+                <!-- Dados do Cliente -->
+                <div class="bg-white rounded-3xl p-6 border border-slate-200 mb-6">
+                    <h2 class="text-lg font-black text-slate-800 mb-4 flex items-center gap-3">
+                        <span class="text-2xl">🛵</span>
+                        Dados do Pedido Online
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Plataforma</label>
+                            <select id="onlinePlatformInput" name="platform" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium">
+                                <option value="Whatsapp">📱 WhatsApp</option>
+                                <option value="iFood">🍕 iFood</option>
+                                <option value="Rappi">🛵 Rappi</option>
+                                <option value="Telefone">📞 Telefone</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Cliente</label>
+                            <input 
+                                id="onlineClienteInput"
+                                type="text" 
+                                name="cliente"
+                                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium"
+                                placeholder="Nome do cliente"
+                                required
+                            />
+                        </div>
+                        
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Endereço</label>
+                            <input 
+                                id="onlineAddressInput"
+                                type="text" 
+                                name="address"
+                                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium"
+                                placeholder="Rua, número, bairro..."
+                                required
+                            />
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Observações</label>
+                        <input 
+                            id="onlineObservacoesInput"
+                            type="text" 
+                            name="observacoes"
+                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium"
+                            placeholder="Sem cebola, bem passado..."
+                        />
+                    </div>
+                </div>
+            </form>
+            
+            <!-- Produtos -->
+            <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                {% for category in categories %}
+                    {% for product in category.products.all %}
+                    <button type="button"
+                       data-cart-action="add"
+                       data-product-id="{{ product.id }}"
+                       onclick="onlineHandleCartAction('add', '{{ product.id }}'); return false;"
+                              class="group p-4 rounded-2xl border transition-all {% if product.available_stock > 0 %}bg-white border-slate-200 hover:border-purple-300 hover:shadow-lg hover:-translate-y-1{% else %}bg-slate-100 border-transparent opacity-60 grayscale pointer-events-none{% endif %}">
+                        <div class="w-16 h-16 mx-auto mb-3 rounded-full overflow-hidden flex items-center justify-center bg-slate-50">
+                            {% if product.image %}
+                            <img src="{{ product.image.url }}" class="w-full h-full object-cover" />
+                            {% else %}
+                            <span class="text-3xl">{{ product.icon|default:"🍔" }}</span>
+                            {% endif %}
+                        </div>
+                        <h4 class="font-bold text-slate-800 text-sm text-center truncate">{{ product.name }}</h4>
+                        <p class="text-center font-black text-slate-800 mt-1">R$ {{ product.price }}</p>
+                    </button>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Carrinho -->
+        <div class="col-span-12 lg:col-span-4">
+            <div class="bg-white rounded-3xl p-6 border border-slate-200 lg:sticky lg:top-24">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-black text-slate-800">Carrinho</h3>
+                    <button id="onlineClearCartBtn" type="button" class="text-slate-400 hover:text-red-600 transition-all {% if not cart %}hidden{% endif %}">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                
+                <div id="onlineCartItemsContainer" class="min-h-[200px]">
+                    {% if cart %}
+                        {% for item in cart %}
+                        <div class="flex items-center gap-3 py-3 border-b border-slate-50">
+                            <span class="text-xl">{{ item.icon|default:"🍔" }}</span>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-bold text-slate-800 text-sm truncate">{{ item.name }}</p>
+                                <p class="text-slate-400 text-xs">R$ {{ item.price }} × {{ item.qty }}</p>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button type="button" data-cart-action="remove" data-product-id="{{ item.id }}" onclick="onlineHandleCartAction('remove', '{{ item.id }}'); return false;" class="w-7 h-7 rounded bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-red-100 hover:text-red-600 text-sm">
+                                    <i class="bi bi-dash"></i>
+                                </button>
+                                <span class="w-6 text-center font-bold text-sm">{{ item.qty }}</span>
+                                <button type="button" data-cart-action="add" data-product-id="{{ item.id }}" onclick="onlineHandleCartAction('add', '{{ item.id }}'); return false;" class="w-7 h-7 rounded bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-600 text-sm">
+                                    <i class="bi bi-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="flex flex-col items-center justify-center py-12 text-center">
+                            <i class="bi bi-cart-x text-4xl text-slate-300"></i>
+                            <p class="font-bold text-slate-400 mt-2">Carrinho vazio</p>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div id="onlineCartFooter" class="mt-6 pt-6 border-t border-slate-100 {% if not cart %}hidden{% endif %}">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-slate-500">Total</span>
+                        <span id="onlineCartTotalValue" class="text-2xl font-black text-slate-800">R$ {{ cart_total|floatformat:2|default:'0.00' }}</span>
+                    </div>
+                    <button type="submit" form="onlineOrderForm" class="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg hover:shadow-purple-500/30 transition-all">
+                        <i class="bi bi-send me-2"></i>Enviar para Cozinha
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const onlineCartApi = {
+    add: "{% url 'api_add_to_cart' 0 %}",
+    remove: "{% url 'api_remove_from_cart' 0 %}",
+    clear: "{% url 'api_clear_cart' %}",
+};
+
+function onlineFormatCurrency(value) {
+    return `R$ ${Number(value || 0).toFixed(2)}`;
+}
+
+function onlineCartEndpoint(template, productId) {
+    return template.replace('/0/', `/${productId}/`);
+}
+
+function onlineGetCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+}
+
+function onlineGetCsrfToken() {
+    return document.querySelector('#onlineOrderForm input[name="csrfmiddlewaretoken"]')?.value || onlineGetCookie('csrftoken') || '';
+}
+
+function onlineCartItemHtml(item) {
+    return `
+        <div class="flex items-center gap-3 py-3 border-b border-slate-50">
+            <span class="text-xl">${item.icon || '🍔'}</span>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-slate-800 text-sm truncate">${item.name}</p>
+                <p class="text-slate-400 text-xs">R$ ${Number(item.price).toFixed(2)} x ${item.qty}</p>
+            </div>
+            <div class="flex items-center gap-1">
+                <button type="button" data-cart-action="remove" data-product-id="${item.id}" onclick="onlineHandleCartAction('remove', '${item.id}'); return false;" class="w-7 h-7 rounded bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-red-100 hover:text-red-600 text-sm">
+                    <i class="bi bi-dash"></i>
+                </button>
+                <span class="w-6 text-center font-bold text-sm">${item.qty}</span>
+                <button type="button" data-cart-action="add" data-product-id="${item.id}" onclick="onlineHandleCartAction('add', '${item.id}'); return false;" class="w-7 h-7 rounded bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-600 text-sm">
+                    <i class="bi bi-plus"></i>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function onlineRenderCart(cart, total) {
+    const cartItemsContainer = document.getElementById('onlineCartItemsContainer');
+    const cartFooter = document.getElementById('onlineCartFooter');
+    const cartTotalValue = document.getElementById('onlineCartTotalValue');
+    const clearCartBtn = document.getElementById('onlineClearCartBtn');
+
+    if (!cartItemsContainer || !cartFooter || !cartTotalValue || !clearCartBtn) {
+        return;
+    }
+
+    if (!cart || cart.length === 0) {
+        cartItemsContainer.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+                <i class="bi bi-cart-x text-4xl text-slate-300"></i>
+                <p class="font-bold text-slate-400 mt-2">Carrinho vazio</p>
+            </div>
+        `;
+        cartFooter.classList.add('hidden');
+        clearCartBtn.classList.add('hidden');
+        cartTotalValue.textContent = onlineFormatCurrency(0);
+        return;
+    }
+
+    cartItemsContainer.innerHTML = cart.map(onlineCartItemHtml).join('');
+    cartTotalValue.textContent = onlineFormatCurrency(total);
+    cartFooter.classList.remove('hidden');
+    clearCartBtn.classList.remove('hidden');
+}
+
+async function onlinePostCart(url) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': onlineGetCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error('Falha na atualização do carrinho.');
+    }
+
+    return response.json();
+}
+
+async function onlineHandleCartAction(action, productId) {
+    try {
+        let data;
+
+        if (action === 'clear') {
+            data = await onlinePostCart(onlineCartApi.clear);
+        } else {
+            const endpoint = action === 'add' ? onlineCartApi.add : onlineCartApi.remove;
+            data = await onlinePostCart(onlineCartEndpoint(endpoint, productId));
+        }
+
+        if (!data.success) {
+            return;
+        }
+
+        const total = data.total ?? data.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        onlineRenderCart(data.cart, total);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+function saveOnlineDraft() {
+    const draft = {
+        platform: document.getElementById('onlinePlatformInput')?.value || 'Whatsapp',
+        cliente: document.getElementById('onlineClienteInput')?.value || '',
+        address: document.getElementById('onlineAddressInput')?.value || '',
+        observacoes: document.getElementById('onlineObservacoesInput')?.value || ''
+    };
+    localStorage.setItem('onlineOrderDraft', JSON.stringify(draft));
+}
+
+function restoreOnlineDraft() {
+    const raw = localStorage.getItem('onlineOrderDraft');
+    if (!raw) return;
+
+    try {
+        const draft = JSON.parse(raw);
+        const platformInput = document.getElementById('onlinePlatformInput');
+        const clienteInput = document.getElementById('onlineClienteInput');
+        const addressInput = document.getElementById('onlineAddressInput');
+        const observacoesInput = document.getElementById('onlineObservacoesInput');
+
+        if (platformInput) platformInput.value = draft.platform || 'Whatsapp';
+        if (clienteInput) clienteInput.value = draft.cliente || '';
+        if (addressInput) addressInput.value = draft.address || '';
+        if (observacoesInput) observacoesInput.value = draft.observacoes || '';
+    } catch (error) {
+        localStorage.removeItem('onlineOrderDraft');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    restoreOnlineDraft();
+
+    const fieldsToWatch = [
+        'onlinePlatformInput',
+        'onlineClienteInput',
+        'onlineAddressInput',
+        'onlineObservacoesInput'
+    ];
+
+    fieldsToWatch.forEach(function(id) {
+        const element = document.getElementById(id);
+        if (!element) return;
+        element.addEventListener('input', saveOnlineDraft);
+        element.addEventListener('change', saveOnlineDraft);
+    });
+
+    const form = document.getElementById('onlineOrderForm');
+    if (form) {
+        form.addEventListener('submit', function() {
+            localStorage.removeItem('onlineOrderDraft');
+        });
+    }
+
+    const initialCart = [
+        {% for item in cart %}
+        {
+            id: {{ item.id }},
+            name: "{{ item.name|escapejs }}",
+            price: {{ item.price }},
+            qty: {{ item.qty }},
+            icon: "{{ item.icon|default:'🍔'|escapejs }}"
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    onlineRenderCart(initialCart, {{ cart_total|default:0 }});
+
+    const clearCartBtn = document.getElementById('onlineClearCartBtn');
+    if (clearCartBtn) {
+        clearCartBtn.addEventListener('click', function(event) {
+            event.preventDefault();
+            onlineHandleCartAction('clear');
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,180 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="{{ app_settings.primary_color|default:'#ef4444' }}">
+    <title>{% block title %}{{ app_settings.store_name }}{% endblock %}</title>
+    <link rel="manifest" href="{% url 'pwa_manifest' %}">
+    
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'sans': ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '{{ app_settings.primary_color|default:"#ef4444" }}',
+                        secondary: '{{ app_settings.secondary_color|default:"#fbbf24" }}',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse-slow {
+            animation: pulse-slow 2s ease-in-out infinite;
+        }
+        
+        @keyframes slide-up {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .toast-enter {
+            animation: slide-up 0.3s ease-out;
+        }
+        
+        @keyframes blob {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+        .animate-blob {
+            animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+            animation-delay: 2s;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-slate-50 min-h-screen">
+    {% block navbar %}{% endblock %}
+    
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Toast Messages -->
+    {% if messages %}
+    <div class="toast-container fixed bottom-4 right-4 z-50 flex flex-col">
+        {% for message in messages %}
+        <div class="toast-enter px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 {% if message.tags == 'success' %}bg-emerald-600{% elif message.tags == 'error' %}bg-red-600{% else %}bg-slate-800{% endif %} text-white mb-2">
+            {% if message.tags == 'success' %}
+            <i class="bi bi-check-circle text-lg"></i>
+            {% elif message.tags == 'error' %}
+            <i class="bi bi-x-circle text-lg"></i>
+            {% else %}
+            <i class="bi bi-info-circle text-lg"></i>
+            {% endif %}
+            <span class="font-medium">{{ message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <script>
+        // Toast notification system
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.querySelector('.toast-container') || createToastContainer();
+            
+            const iconMap = {
+                'success': 'bi-check-circle',
+                'error': 'bi-x-circle',
+                'warning': 'bi-exclamation-triangle',
+                'info': 'bi-info-circle'
+            };
+            
+            const colorMap = {
+                'success': 'bg-emerald-600',
+                'error': 'bg-red-600',
+                'warning': 'bg-amber-600',
+                'info': 'bg-slate-800'
+            };
+            
+            const toast = document.createElement('div');
+            toast.className = `toast-enter px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 ${colorMap[type] || colorMap.info} text-white mb-2`;
+            toast.innerHTML = `
+                <i class="bi ${iconMap[type] || iconMap.info} text-lg"></i>
+                <span class="font-medium">${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateY(0)';
+            }, 10);
+            
+            // Animate out and remove
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(20px)';
+                toast.style.transition = 'all 0.3s ease-out';
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+        
+        function createToastContainer() {
+            const container = document.createElement('div');
+            container.className = 'toast-container fixed bottom-4 right-4 z-50 flex flex-col';
+            document.body.appendChild(container);
+            return container;
+        }
+        
+        // Auto-hide Django messages toasts
+        document.addEventListener('DOMContentLoaded', function() {
+            const toasts = document.querySelectorAll('.toast-enter');
+            toasts.forEach(function(toast) {
+                setTimeout(function() {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateY(20px)';
+                    toast.style.transition = 'all 0.3s ease-out';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            });
+
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('{% url "pwa_service_worker" %}').catch(function() {});
+            }
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

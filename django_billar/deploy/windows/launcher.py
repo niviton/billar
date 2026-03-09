@@ -73,7 +73,8 @@ def main():
     start_windows_service('Redis')
 
     if IS_FROZEN:
-        # Modo executável - roda Django com Daphne (ASGI) para WebSocket
+        # Modo executável - roda Django com Waitress (WSGI)
+        # WebSocket não funciona no .exe, sistema usa HTTP polling como fallback
         import django
         django.setup()
         
@@ -83,16 +84,13 @@ def main():
         except Exception as e:
             print(f'Aviso: migrate falhou - {e}')
         
-        # Inicia servidor Daphne (ASGI) para suporte a WebSocket
+        # Inicia servidor Waitress (WSGI)
         import threading
-        from daphne.server import Server
-        from daphne.endpoints import build_endpoint_description_strings
-        from billar_project.asgi import application
+        from waitress import serve
+        from billar_project.wsgi import application
         
         def run_server():
-            endpoints = build_endpoint_description_strings(host=WAITRESS_HOST, port=WAITRESS_PORT)
-            server = Server(application, endpoints=endpoints)
-            server.run()
+            serve(application, host=WAITRESS_HOST, port=WAITRESS_PORT)
         
         server_thread = threading.Thread(target=run_server, daemon=True)
         server_thread.start()

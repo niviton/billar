@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Cupom - {{ settings.store_name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            width: 300px;
+            margin: 0 auto;
+            padding: 10px;
+            background: white;
+            color: #000;
+        }
+        
+        .header {
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #000;
+            margin-bottom: 10px;
+        }
+        
+        .header img.logo {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            margin-bottom: 8px;
+            object-fit: cover;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 5px 0;
+            letter-spacing: 1px;
+        }
+        
+        .header .slogan {
+            font-size: 10px;
+            font-style: italic;
+            margin: 3px 0;
+        }
+        
+        .header .company-info {
+            font-size: 9px;
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+        
+        .header .company-info p {
+            margin: 2px 0;
+        }
+        
+        .cupom-title {
+            text-align: center;
+            padding: 8px 0;
+            background: #000;
+            color: #fff;
+            font-weight: bold;
+            font-size: 11px;
+            letter-spacing: 2px;
+            margin: 10px 0;
+        }
+        
+        .order-info {
+            margin: 10px 0;
+            padding: 10px 0;
+            border-bottom: 1px dashed #000;
+        }
+        
+        .order-info table {
+            width: 100%;
+        }
+        
+        .order-info td {
+            padding: 2px 0;
+        }
+        
+        .order-info td:last-child {
+            text-align: right;
+            font-weight: bold;
+        }
+        
+        .address-box {
+            border: 2px solid #000;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .address-box .label {
+            font-weight: bold;
+            font-size: 11px;
+            margin-bottom: 5px;
+        }
+        
+        .items-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 10px;
+            padding: 5px 0;
+            border-bottom: 1px solid #000;
+            background: #f0f0f0;
+            padding-left: 5px;
+            padding-right: 5px;
+        }
+        
+        .items {
+            margin: 0;
+        }
+        
+        .item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 5px;
+            border-bottom: 1px dotted #ccc;
+            font-size: 11px;
+        }
+        
+        .item:last-child {
+            border-bottom: none;
+        }
+        
+        .item .qty {
+            width: 25px;
+            text-align: center;
+        }
+        
+        .item .name {
+            flex: 1;
+            padding-left: 5px;
+        }
+        
+        .item .price {
+            width: 70px;
+            text-align: right;
+        }
+        
+        .subtotal-section {
+            border-top: 1px dashed #000;
+            margin-top: 10px;
+            padding-top: 10px;
+        }
+        
+        .subtotal-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 5px;
+            font-size: 11px;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 5px;
+            font-size: 16px;
+            font-weight: bold;
+            border-top: 2px solid #000;
+            border-bottom: 2px solid #000;
+            margin-top: 5px;
+            background: #f8f8f8;
+        }
+        
+        .payment-box {
+            background: #e8e8e8;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .obs-box {
+            background: #fff8dc;
+            border: 1px solid #ddd;
+            padding: 8px;
+            margin: 10px 0;
+            font-size: 10px;
+        }
+        
+        .obs-box .label {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        
+        .pix-section {
+            text-align: center;
+            margin: 15px 0;
+            padding: 15px 10px;
+            border: 2px dashed #000;
+            background: #f9fff9;
+        }
+        
+        .pix-section .title {
+            font-weight: bold;
+            font-size: 12px;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        
+        .pix-section img {
+            width: 130px;
+            height: 130px;
+            border: 2px solid #000;
+            padding: 5px;
+            background: #fff;
+        }
+        
+        .pix-section .pix-key {
+            font-size: 9px;
+            margin-top: 8px;
+            word-break: break-all;
+        }
+        
+        .pix-section .pix-name {
+            font-size: 10px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        
+        .pix-section .pix-instruction {
+            font-size: 9px;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px dashed #000;
+            font-size: 10px;
+        }
+        
+        .footer .thanks {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .footer .datetime {
+            font-size: 9px;
+            margin-top: 10px;
+            color: #666;
+        }
+        
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 10px 0;
+        }
+        
+        @media print {
+            body {
+                width: 100%;
+            }
+            
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        {% if settings.logo %}
+            <img class="logo" src="{{ settings.logo.url }}" alt="Logo">
+        {% endif %}
+        <h1>{{ settings.store_name }}</h1>
+        {% if settings.slogan %}
+        <p class="slogan">{{ settings.slogan }}</p>
+        {% endif %}
+        
+        <div class="company-info">
+            {% if settings.cnpj %}
+            <p><strong>CNPJ:</strong> {{ settings.cnpj }}</p>
+            {% endif %}
+            {% if settings.address %}
+            <p>{{ settings.address }}</p>
+            {% endif %}
+            {% if settings.city %}
+            <p>{{ settings.city }}</p>
+            {% endif %}
+            {% if settings.phone %}
+            <p><strong>Tel:</strong> {{ settings.phone }}</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="cupom-title">CUPOM NÃO FISCAL</div>
+    
+    <!-- Order Info -->
+    <div class="order-info">
+        <table>
+            <tr>
+                <td>PEDIDO Nº</td>
+                <td>#{{ order.id }}</td>
+            </tr>
+            <tr>
+                <td>{% if order.order_type == 'delivery' %}CLIENTE{% else %}MESA{% endif %}</td>
+                <td>{% if order.order_type == 'delivery' %}{{ order.cliente }}{% else %}{{ order.mesa }}{% endif %}</td>
+            </tr>
+            {% if order.order_type != 'delivery' and order.cliente %}
+            <tr>
+                <td>CLIENTE</td>
+                <td>{{ order.cliente }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td>DATA</td>
+                <td>{{ order.created_at|date:"d/m/Y" }}</td>
+            </tr>
+            <tr>
+                <td>HORA</td>
+                <td>{{ order.created_at|date:"H:i" }}</td>
+            </tr>
+            {% if order.order_type == 'delivery' %}
+            <tr>
+                <td>TIPO</td>
+                <td>DELIVERY</td>
+            </tr>
+            {% endif %}
+        </table>
+    </div>
+    
+    {% if order.address %}
+    <div class="address-box">
+        <div class="label">ENDERECO DE ENTREGA</div>
+        {{ order.address }}
+    </div>
+    {% endif %}
+    
+    <!-- Items Header -->
+    <div class="items-header">
+        <span style="width: 25px; text-align: center;">QTD</span>
+        <span style="flex: 1; padding-left: 5px;">DESCRICAO</span>
+        <span style="width: 70px; text-align: right;">VALOR</span>
+    </div>
+    
+    <!-- Items -->
+    <div class="items">
+        {% for item in order.items.all %}
+        <div class="item">
+            <span class="qty">{{ item.quantity }}</span>
+            <span class="name">{{ item.product.name }}</span>
+            <span class="price">R$ {{ item.subtotal|floatformat:2 }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Totals -->
+    <div class="subtotal-section">
+        <div class="subtotal-row">
+            <span>Subtotal ({{ order.items.count }} itens)</span>
+            <span>R$ {{ order.total|floatformat:2 }}</span>
+        </div>
+    </div>
+    
+    <div class="total-row">
+        <span>TOTAL</span>
+        <span>R$ {{ order.total|floatformat:2 }}</span>
+    </div>
+    
+    {% if order.payment_method %}
+    <div class="payment-box">
+        FORMA DE PAGAMENTO: {{ order.get_payment_method_display }}
+    </div>
+    {% endif %}
+    
+    {% if order.observacoes %}
+    <div class="obs-box">
+        <div class="label">OBSERVACOES:</div>
+        {{ order.observacoes }}
+    </div>
+    {% endif %}
+    
+    <!-- QR Code PIX - Only if enabled -->
+    {% if settings.pix_key and settings.show_pix_on_receipt %}
+    <div class="pix-section">
+        <div class="title">PAGAMENTO VIA PIX</div>
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ settings.pix_key }}" alt="QR Code Pix">
+        {% if settings.pix_name %}
+        <p class="pix-name">{{ settings.pix_name }}</p>
+        {% endif %}
+        <p class="pix-key">Chave: {{ settings.pix_key }}</p>
+        <p class="pix-instruction">Escaneie o QR Code para pagar</p>
+    </div>
+    {% endif %}
+    
+    <!-- Footer -->
+    <div class="footer">
+        <p class="thanks">OBRIGADO PELA PREFERENCIA!</p>
+        <p>Volte sempre!</p>
+        <div class="divider"></div>
+        <p>{{ settings.store_name }}</p>
+        <p class="datetime">Impresso em: {% now "d/m/Y H:i" %}</p>
+    </div>
+    
+    <!-- Print Button -->
+    <div class="no-print" style="text-align: center; margin-top: 20px;">
+        <button onclick="window.print()" style="padding: 12px 40px; font-size: 14px; cursor: pointer; background: #ef4444; color: white; border: none; border-radius: 8px; font-weight: bold;">
+            IMPRIMIR CUPOM
+        </button>
+    </div>
+</body>
+</html>

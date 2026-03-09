@@ -1,0 +1,253 @@
+{% extends 'restaurante/admin/base_admin.html' %}
+
+{% block title %}Configurações - {{ app_settings.store_name }}{% endblock %}
+
+{% block admin_content %}
+<div class="max-w-[800px] mx-auto">
+    <!-- Título -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-black text-slate-800">Configurações</h1>
+        <p class="text-slate-500">Personalize seu sistema</p>
+    </div>
+    
+    <!-- Formulário -->
+    <form method="post" enctype="multipart/form-data" class="space-y-6">
+        {% csrf_token %}
+        
+        <!-- Informações da Loja -->
+        <div class="bg-white rounded-3xl p-8 border border-slate-200">
+            <h2 class="text-lg font-black text-slate-800 mb-6 flex items-center gap-3">
+                <div class="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-shop text-slate-600"></i>
+                </div>
+                Informações da Loja
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Nome da Loja</label>
+                    <input 
+                        type="text" 
+                        name="store_name"
+                        value="{{ settings.store_name }}"
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 outline-none transition-all font-medium"
+                    />
+                </div>
+                
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Slogan</label>
+                    <input 
+                        type="text" 
+                        name="slogan"
+                        value="{{ settings.slogan }}"
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 outline-none transition-all font-medium"
+                    />
+                </div>
+                
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Telefone</label>
+                    <input 
+                        type="text" 
+                        name="phone"
+                        value="{{ settings.phone }}"
+                        placeholder="(00) 00000-0000"
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 outline-none transition-all font-medium"
+                    />
+                </div>
+                
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">CNPJ</label>
+                    <input 
+                        type="text" 
+                        name="cnpj"
+                        value="{{ settings.cnpj }}"
+                        placeholder="00.000.000/0000-00"
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 outline-none transition-all font-medium"
+                    />
+                </div>
+                
+                <div class="md:col-span-2">
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Endereço</label>
+                    <input 
+                        type="text" 
+                        name="address"
+                        value="{{ settings.address }}"
+                        placeholder="Rua, número, bairro"
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 outline-none transition-all font-medium"
+                    />
+                </div>
+                
+                <div class="md:col-span-2">
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Cidade / Estado</label>
+                    <input 
+                        type="text" 
+                        name="city"
+                        value="{{ settings.city }}"
+                        placeholder="Cidade - UF"
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 outline-none transition-all font-medium"
+                    />
+                </div>
+            </div>
+            
+            <div class="mt-6">
+                <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Logo</label>
+                <div class="flex items-center gap-4">
+                    <div class="w-20 h-20 rounded-2xl bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
+                        {% if settings.logo %}
+                        <img src="{{ settings.logo.url }}" class="w-full h-full object-cover" />
+                        {% else %}
+                        <i class="bi bi-image text-3xl text-slate-300"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1">
+                        <input 
+                            type="file" 
+                            name="logo"
+                            accept="image/*"
+                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-bold file:bg-slate-900 file:text-white hover:file:bg-slate-800"
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- PIX -->
+        <div class="bg-white rounded-3xl p-8 border border-slate-200">
+            <h2 class="text-lg font-black text-slate-800 mb-6 flex items-center gap-3">
+                <div class="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-qr-code text-green-600"></i>
+                </div>
+                Pagamento PIX
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Chave PIX</label>
+                    <input 
+                        type="text" 
+                        name="pix_key"
+                        value="{{ settings.pix_key }}"
+                        placeholder="CPF, CNPJ, telefone ou e-mail"
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-all font-medium"
+                    />
+                </div>
+                
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Nome do Titular</label>
+                    <input 
+                        type="text" 
+                        name="pix_name"
+                        value="{{ settings.pix_name }}"
+                        placeholder="Nome que aparece no PIX"
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 focus:ring-2 focus:ring-green-500/50 focus:border-green-500 outline-none transition-all font-medium"
+                    />
+                </div>
+                
+                <div class="md:col-span-2">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            name="show_pix_on_receipt"
+                            {% if settings.show_pix_on_receipt %}checked{% endif %}
+                            class="w-5 h-5 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                        />
+                        <span class="font-medium text-slate-700">Exibir QR Code PIX na nota fiscal</span>
+                    </label>
+                    <p class="text-sm text-slate-400 mt-1 ml-8">Quando ativado, o QR Code do PIX aparecerá automaticamente na impressão da conta</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Cores -->
+        <div class="bg-white rounded-3xl p-8 border border-slate-200">
+            <h2 class="text-lg font-black text-slate-800 mb-6 flex items-center gap-3">
+                <div class="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-palette text-slate-600"></i>
+                </div>
+                Personalização
+            </h2>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Cor Primária</label>
+                    <div class="flex items-center gap-2">
+                        <input 
+                            type="color" 
+                            name="primary_color"
+                            value="{{ settings.primary_color }}"
+                            class="w-12 h-12 rounded-xl border-0 cursor-pointer"
+                        />
+                        <input 
+                            type="text" 
+                            value="{{ settings.primary_color }}"
+                            class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-sm"
+                            readonly
+                        />
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Cor Secundária</label>
+                    <div class="flex items-center gap-2">
+                        <input 
+                            type="color" 
+                            name="secondary_color"
+                            value="{{ settings.secondary_color }}"
+                            class="w-12 h-12 rounded-xl border-0 cursor-pointer"
+                        />
+                        <input 
+                            type="text" 
+                            value="{{ settings.secondary_color }}"
+                            class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-sm"
+                            readonly
+                        />
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Cor de Fundo</label>
+                    <div class="flex items-center gap-2">
+                        <input 
+                            type="color" 
+                            name="background_color"
+                            value="{{ settings.background_color }}"
+                            class="w-12 h-12 rounded-xl border-0 cursor-pointer"
+                        />
+                        <input 
+                            type="text" 
+                            value="{{ settings.background_color }}"
+                            class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-sm"
+                            readonly
+                        />
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Cor do Texto</label>
+                    <div class="flex items-center gap-2">
+                        <input 
+                            type="color" 
+                            name="text_color"
+                            value="{{ settings.text_color }}"
+                            class="w-12 h-12 rounded-xl border-0 cursor-pointer"
+                        />
+                        <input 
+                            type="text" 
+                            value="{{ settings.text_color }}"
+                            class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-sm"
+                            readonly
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Botão Salvar -->
+        <div class="flex justify-end">
+            <button type="submit" class="px-8 py-4 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl font-bold hover:shadow-lg hover:shadow-red-500/30 transition-all">
+                <i class="bi bi-check-lg me-2"></i>Salvar Configurações
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

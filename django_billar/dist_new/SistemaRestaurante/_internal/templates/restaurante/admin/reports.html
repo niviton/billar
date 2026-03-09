@@ -1,0 +1,153 @@
+{% extends 'restaurante/admin/base_admin.html' %}
+
+{% block title %}Relatórios - {{ app_settings.store_name }}{% endblock %}
+
+{% block admin_content %}
+<div class="max-w-[1400px] mx-auto">
+    <!-- Título -->
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-3xl font-black text-slate-800">Relatórios</h1>
+            <p class="text-slate-500">Acompanhe o desempenho do seu negócio</p>
+        </div>
+        
+        <!-- Filtro por Calendário -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-3 flex flex-wrap items-end gap-3">
+            <form method="get" class="flex items-end gap-2">
+                <input type="hidden" name="filter" value="day" />
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Dia</label>
+                    <input type="date" name="day" value="{{ selected_day }}" class="px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700" />
+                </div>
+                <button type="submit" class="px-3 py-2 rounded-xl text-sm font-bold {% if filter_type == 'day' %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">Aplicar</button>
+            </form>
+
+            <form method="get" class="flex items-end gap-2">
+                <input type="hidden" name="filter" value="month" />
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Mês</label>
+                    <input type="month" name="month" value="{{ selected_month }}" class="px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700" />
+                </div>
+                <button type="submit" class="px-3 py-2 rounded-xl text-sm font-bold {% if filter_type == 'month' %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">Aplicar</button>
+            </form>
+
+            <form method="get" class="flex items-end gap-2">
+                <input type="hidden" name="filter" value="year" />
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Ano</label>
+                    <select name="year" class="px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700">
+                        {% for year in year_options %}
+                        <option value="{{ year }}" {% if selected_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="px-3 py-2 rounded-xl text-sm font-bold {% if filter_type == 'year' %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">Aplicar</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <!-- Faturamento -->
+        <div class="bg-gradient-to-br from-emerald-500 to-green-600 rounded-3xl p-6 text-white">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-currency-dollar text-2xl"></i>
+                </div>
+                <i class="bi bi-graph-up-arrow text-2xl opacity-50"></i>
+            </div>
+            <p class="text-4xl font-black">R$ {{ total_revenue|floatformat:2 }}</p>
+            <p class="text-sm opacity-70 mt-1">Faturamento Total</p>
+        </div>
+        
+        <!-- Pedidos -->
+        <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl p-6 text-white">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-receipt text-2xl"></i>
+                </div>
+                <i class="bi bi-bar-chart text-2xl opacity-50"></i>
+            </div>
+            <p class="text-4xl font-black">{{ total_orders }}</p>
+            <p class="text-sm opacity-70 mt-1">Pedidos Finalizados</p>
+        </div>
+        
+        <!-- Ticket Médio -->
+        <div class="bg-gradient-to-br from-purple-500 to-pink-600 rounded-3xl p-6 text-white">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-tag text-2xl"></i>
+                </div>
+                <i class="bi bi-cash-stack text-2xl opacity-50"></i>
+            </div>
+            <p class="text-4xl font-black">R$ {{ ticket_medio|floatformat:2 }}</p>
+            <p class="text-sm opacity-70 mt-1">Ticket Médio</p>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Ranking de Garçons -->
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-trophy text-amber-600"></i>
+                </div>
+                <h2 class="text-lg font-black text-slate-800">Ranking de Garçons</h2>
+            </div>
+            
+            <div class="space-y-4">
+                {% for waiter in waiter_ranking %}
+                <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg {% if forloop.counter == 1 %}bg-amber-100 text-amber-600{% elif forloop.counter == 2 %}bg-slate-200 text-slate-600{% elif forloop.counter == 3 %}bg-orange-100 text-orange-600{% else %}bg-slate-100 text-slate-500{% endif %}">
+                        {{ forloop.counter }}
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-bold text-slate-800">{{ waiter.waiter__username }}</p>
+                        <p class="text-sm text-slate-400">{{ waiter.orders_count }} pedidos</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-black text-slate-800">R$ {{ waiter.total_sales|floatformat:2 }}</p>
+                        <p class="text-xs text-slate-400">Ticket: R$ {{ waiter.avg_ticket|floatformat:2 }}</p>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-8">
+                    <p class="text-slate-400">Nenhum dado disponível</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Produtos Mais Vendidos -->
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-star text-emerald-600"></i>
+                </div>
+                <h2 class="text-lg font-black text-slate-800">Produtos Mais Vendidos</h2>
+            </div>
+            
+            <div class="space-y-4">
+                {% for product in top_products %}
+                <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl">
+                    <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-2xl shadow-sm">
+                        {{ product.product__icon|default:"🍔" }}
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-bold text-slate-800">{{ product.product__name }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-black text-slate-800">{{ product.total_qty }}x</p>
+                        <p class="text-xs text-emerald-600">R$ {{ product.total_revenue|floatformat:2 }}</p>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-8">
+                    <p class="text-slate-400">Nenhum dado disponível</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

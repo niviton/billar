@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Administração - {{ app_settings.store_name }}{% endblock %}
+
+{% block navbar %}
+<!-- Header -->
+<header class="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm sticky top-0 z-30">
+    <div class="flex items-center gap-4">
+        <div class="w-10 h-10 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center border border-slate-200">
+            {% if app_settings.logo %}
+            <img src="{{ app_settings.logo.url }}" class="w-full h-full object-cover" />
+            {% else %}
+            <i class="bi bi-shop text-slate-400"></i>
+            {% endif %}
+        </div>
+        <div>
+            <h2 class="text-xl font-black tracking-tight text-slate-800 leading-none">{{ app_settings.store_name }}</h2>
+            <div class="flex items-center gap-2 mt-1">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Administração</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex items-center gap-6">
+        <form method="post" action="{% url 'toggle_store_status' %}" class="hidden md:block">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+            <button type="submit" class="px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all {% if app_settings.is_store_open %}bg-emerald-100 text-emerald-700 hover:bg-emerald-200{% else %}bg-red-100 text-red-700 hover:bg-red-200{% endif %}">
+                {% if app_settings.is_store_open %}
+                <i class="bi bi-door-open me-1"></i>Fechar Loja
+                {% else %}
+                <i class="bi bi-door-open-fill me-1"></i>Abrir Loja
+                {% endif %}
+            </button>
+        </form>
+        <div class="text-right hidden md:block">
+            <p class="text-sm font-bold text-slate-700">{{ user.username }}</p>
+            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{{ user.role }}</p>
+        </div>
+        <a href="{% url 'logout' %}" class="p-3 bg-slate-100 text-slate-500 rounded-2xl hover:bg-red-50 hover:text-red-600 transition-all group border border-transparent hover:border-red-100">
+            <i class="bi bi-box-arrow-right text-lg group-hover:rotate-12 transition-transform"></i>
+        </a>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="flex min-h-[calc(100vh-5rem)]">
+    <!-- Sidebar -->
+    <nav class="w-72 bg-white border-r border-slate-200 flex flex-col p-6 gap-2 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)]">
+        <div class="mb-6 px-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Menu Principal</p>
+        </div>
+        
+        <a href="{% url 'admin_dashboard' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'dashboard' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i class="bi bi-grid-1x2 text-lg {% if active_menu == 'dashboard' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+            Dashboard
+        </a>
+        
+        <a href="{% url 'admin_reports' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'reports' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i class="bi bi-bar-chart text-lg {% if active_menu == 'reports' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+            Relatórios
+        </a>
+        
+        <a href="{% url 'admin_menu' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'menu' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i class="bi bi-bag text-lg {% if active_menu == 'menu' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+            Cardápio
+        </a>
+
+        <a href="{% url 'admin_ingredients' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'ingredients' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i class="bi bi-box-seam text-lg {% if active_menu == 'ingredients' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+            Ingredientes
+        </a>
+        
+        <a href="{% url 'admin_users' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'users' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i class="bi bi-people text-lg {% if active_menu == 'users' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+            Equipe
+        </a>
+        
+        <a href="{% url 'admin_online_orders' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'online' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i class="bi bi-phone text-lg {% if active_menu == 'online' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+            Pedidos Online
+        </a>
+        
+        <a href="{% url 'admin_settings' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'settings' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i class="bi bi-gear text-lg {% if active_menu == 'settings' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+            Configurações
+        </a>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-8 overflow-y-auto bg-slate-50/50">
+        {% block admin_content %}{% endblock %}
+    </main>
+</div>
+{% endblock %}
