@@ -6,8 +6,17 @@ import time
 import webbrowser
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-VENV_PYTHON = BASE_DIR / 'venv' / 'Scripts' / 'python.exe'
+# Detecta se está rodando como executável PyInstaller
+if getattr(sys, 'frozen', False):
+    # Executável - usa o diretório do exe
+    BASE_DIR = Path(sys.executable).resolve().parent
+    PYTHON_EXE = sys.executable
+    IS_FROZEN = True
+else:
+    # Desenvolvimento - usa venv
+    BASE_DIR = Path(__file__).resolve().parents[2]
+    PYTHON_EXE = str(BASE_DIR / 'venv' / 'Scripts' / 'python.exe')
+    IS_FROZEN = False
 
 WAITRESS_HOST = os.getenv('APP_HOST', '0.0.0.0')
 WAITRESS_PORT = int(os.getenv('APP_PORT', '8000'))
@@ -50,54 +59,98 @@ def wait_for_port(host, port, timeout=30):
 
 
 def main():
-    if not VENV_PYTHON.exists():
+    if not IS_FROZEN and not Path(PYTHON_EXE).exists():
         print('Ambiente virtual não encontrado em venv\\Scripts\\python.exe')
         return 1
 
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'billar_project.settings')
+    
+    # Adiciona o diretório base ao path para imports
+    if str(BASE_DIR) not in sys.path:
+        sys.path.insert(0, str(BASE_DIR))
 
     start_windows_service('postgresql-x64-16')
     start_windows_service('Redis')
 
-    run([str(VENV_PYTHON), 'manage.py', 'migrate'])
+    if IS_FROZEN:
+        # Modo executável - roda Django diretamente
+        import django
+        django.setup()
+        
+        from django.core.management import call_command
+        try:
+            call_command('migrate', verbosity=0)
+        except Exception as e:
+            print(f'Aviso: migrate falhou - {e}')
+        
+        # Inicia servidor em thread separada
+        import threading
+        from waitress import serve
+        from billar_project.wsgi import application
+        
+        def run_server():
+            serve(application, host=WAITRESS_HOST, port=WAITRESS_PORT)
+        
+        server_thread = threading.Thread(target=run_server, daemon=True)
+        server_thread.start()
+        
+        lan_ip = get_local_ip()
+        url = f'http://{lan_ip}:{WAITRESS_PORT}'
+        
+        if wait_for_port('127.0.0.1', WAITRESS_PORT):
+            webbrowser.open(url)
+        
+        print('Sistema iniciado em:', url)
+        print('Pressione Ctrl+C para encerrar')
+        
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+        
+        return 0
+    else:
+        # Modo desenvolvimento - usa subprocessos
+        run([PYTHON_EXE, 'manage.py', 'migrate'])
 
-    waitress_cmd = [
-        str(VENV_PYTHON), '-m', 'waitress',
-        f'--listen={WAITRESS_HOST}:{WAITRESS_PORT}',
-        'billar_project.wsgi:application',
-    ]
-    daphne_cmd = [
-        str(VENV_PYTHON), '-m', 'daphne',
-        '-b', WAITRESS_HOST,
-        '-p', str(DAPHNE_PORT),
-        'billar_project.asgi:application',
-    ]
+        waitress_cmd = [
+            PYTHON_EXE, '-m', 'waitress',
+            f'--listen={WAITRESS_HOST}:{WAITRESS_PORT}',
+            'billar_project.wsgi:application',
+        ]
+        daphne_cmd = [
+            PYTHON_EXE, '-m', 'daphne',
+            '-b', WAITRESS_HOST,
+            '-p', str(DAPHNE_PORT),
+            'billar_project.asgi:application',
+        ]
 
-    waitress_proc = subprocess.Popen(waitress_cmd, cwd=BASE_DIR)
-    daphne_proc = subprocess.Popen(daphne_cmd, cwd=BASE_DIR)
+        waitress_proc = subprocess.Popen(waitress_cmd, cwd=BASE_DIR)
+        daphne_proc = subprocess.Popen(daphne_cmd, cwd=BASE_DIR)
 
-    lan_ip = get_local_ip()
-    url = f'http://{lan_ip}:{WAITRESS_PORT}'
+        lan_ip = get_local_ip()
+        url = f'http://{lan_ip}:{WAITRESS_PORT}'
 
-    if wait_for_port('127.0.0.1', WAITRESS_PORT):
-        webbrowser.open(url)
+        if wait_for_port('127.0.0.1', WAITRESS_PORT):
+            webbrowser.open(url)
 
-    print('Sistema iniciado em:', url)
-    print('Pressione Ctrl+C para encerrar')
+        print('Sistema iniciado em:', url)
+        print('Pressione Ctrl+C para encerrar')
 
-    try:
-        while True:
-            time.sleep(1)
-            if waitress_proc.poll() is not None or daphne_proc.poll() is not None:
-                break
-    except KeyboardInterrupt:
-        pass
-    finally:
-        for process in [waitress_proc, daphne_proc]:
-            if process.poll() is None:
-                process.terminate()
+        try:
+            while True:
+                time.sleep(1)
+                if waitress_proc.poll() is not None or daphne_proc.poll() is not None:
+                    break
+        except KeyboardInterrupt:
+            pass
+        finally:
+            for process in [waitress_proc, daphne_proc]:
+                if process.poll() is None:
+                    process.terminate()
 
-    return 0
+        return 0
 
 
 if __name__ == '__main__':

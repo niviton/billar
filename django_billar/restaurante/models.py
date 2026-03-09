@@ -54,7 +54,7 @@ class Product(models.Model):
         verbose_name_plural = 'Produtos'
         ordering = ['category', 'name']
         constraints = [
-            models.CheckConstraint(check=models.Q(stock__gte=0), name='product_stock_non_negative'),
+            models.CheckConstraint(condition=models.Q(stock__gte=0), name='product_stock_non_negative'),
         ]
 
     def __str__(self):
@@ -157,8 +157,8 @@ class Ingredient(models.Model):
         verbose_name_plural = 'Ingredientes'
         ordering = ['name']
         constraints = [
-            models.CheckConstraint(check=models.Q(stock_quantity__gte=0), name='ingredient_stock_non_negative'),
-            models.CheckConstraint(check=models.Q(cost_price__gte=0), name='ingredient_cost_non_negative'),
+            models.CheckConstraint(condition=models.Q(stock_quantity__gte=0), name='ingredient_stock_non_negative'),
+            models.CheckConstraint(condition=models.Q(cost_price__gte=0), name='ingredient_cost_non_negative'),
         ]
 
     def __str__(self):
@@ -176,7 +176,7 @@ class ProductIngredient(models.Model):
         verbose_name_plural = 'Ingredientes da Receita'
         unique_together = ('product', 'ingredient')
         constraints = [
-            models.CheckConstraint(check=models.Q(quantity__gt=0), name='recipe_quantity_positive'),
+            models.CheckConstraint(condition=models.Q(quantity__gt=0), name='recipe_quantity_positive'),
         ]
 
     def __str__(self):
@@ -254,10 +254,10 @@ class OrderItem(models.Model):
         verbose_name = 'Item do Pedido'
         verbose_name_plural = 'Itens do Pedido'
         constraints = [
-            models.CheckConstraint(check=models.Q(quantity__gt=0), name='orderitem_quantity_positive'),
-            models.CheckConstraint(check=models.Q(pending_quantity__gte=0), name='orderitem_pending_non_negative'),
-            models.CheckConstraint(check=models.Q(pending_quantity__lte=models.F('quantity')), name='orderitem_pending_lte_quantity'),
-            models.CheckConstraint(check=models.Q(unit_price__gte=0), name='orderitem_unit_price_non_negative'),
+            models.CheckConstraint(condition=models.Q(quantity__gt=0), name='orderitem_quantity_positive'),
+            models.CheckConstraint(condition=models.Q(pending_quantity__gte=0), name='orderitem_pending_non_negative'),
+            models.CheckConstraint(condition=models.Q(pending_quantity__lte=models.F('quantity')), name='orderitem_pending_lte_quantity'),
+            models.CheckConstraint(condition=models.Q(unit_price__gte=0), name='orderitem_unit_price_non_negative'),
         ]
 
     def __str__(self):
@@ -278,13 +278,26 @@ class AppSettings(models.Model):
     store_name = models.CharField(max_length=200, default='Billá Burger', verbose_name='Nome da Loja')
     slogan = models.CharField(max_length=500, default='Os melhores hambúrgueres da cidade!', verbose_name='Slogan')
     logo = models.ImageField(upload_to='settings/', blank=True, null=True, verbose_name='Logo')
+    
+    # Dados da empresa para nota fiscal
+    cnpj = models.CharField(max_length=20, blank=True, verbose_name='CNPJ/CPF')
+    phone = models.CharField(max_length=20, blank=True, verbose_name='Telefone')
+    address = models.CharField(max_length=300, blank=True, verbose_name='Endereço')
+    city = models.CharField(max_length=100, blank=True, verbose_name='Cidade/UF')
+    
+    # Aparência
     font = models.CharField(max_length=100, default='Google Sans', verbose_name='Fonte')
     font_size = models.IntegerField(default=16, verbose_name='Tamanho da Fonte')
     primary_color = models.CharField(max_length=20, default='#ef4444', verbose_name='Cor Primária')
     secondary_color = models.CharField(max_length=20, default='#fbbf24', verbose_name='Cor Secundária')
     background_color = models.CharField(max_length=20, default='#f8f9fa', verbose_name='Cor de Fundo')
     text_color = models.CharField(max_length=20, default='#1e293b', verbose_name='Cor do Texto')
+    
+    # PIX
     pix_key = models.CharField(max_length=200, blank=True, verbose_name='Chave PIX')
+    pix_name = models.CharField(max_length=100, blank=True, verbose_name='Nome do titular PIX')
+    show_pix_on_receipt = models.BooleanField(default=True, verbose_name='Mostrar QR Code PIX na nota')
+    
     is_store_open = models.BooleanField(default=True, verbose_name='Loja Aberta')
 
     class Meta:

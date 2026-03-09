@@ -288,7 +288,7 @@ function connectAdminDashboardSocket() {
         
         adminDashboardSocket.onerror = function(error) {
             console.error('Dashboard WebSocket error:', error);
-            updateConnectionStatus('error', 'Erro na conexão em tempo real', '⚠️');
+            // Silencioso - polling será ativado no onclose
         };
         
         adminDashboardSocket.onclose = function(e) {
@@ -297,24 +297,23 @@ function connectAdminDashboardSocket() {
             
             if (adminReconnectAttempts < adminMaxReconnectAttempts) {
                 adminReconnectAttempts++;
-                const delay = Math.min(1000 * Math.pow(2, adminReconnectAttempts), 30000);
-                updateConnectionStatus('error', `Reconectando em ${Math.ceil(delay/1000)}s... (tentativa ${adminReconnectAttempts}/${adminMaxReconnectAttempts})`, '🔄');
+                const delay = Math.min(1000 * Math.pow(2, adminReconnectAttempts), 10000);
                 
                 adminReconnectTimeout = setTimeout(() => {
                     connectAdminDashboardSocket();
                 }, delay);
             } else {
-                updateConnectionStatus('error', 'Não foi possível conectar. Atualizando a cada 15s...', '⚠️');
-                // Fallback to polling
-                setInterval(fetchDashboardData, 15000);
+                // Fallback silencioso com polling rápido
+                document.getElementById('connectionStatus')?.remove();
+                setInterval(fetchDashboardData, 3000);
             }
         };
         
     } catch (error) {
         console.error('Error creating dashboard WebSocket:', error);
-        updateConnectionStatus('error', 'WebSocket não suportado. Usando atualização periódica.', '⚠️');
-        // Fallback to polling
-        setInterval(fetchDashboardData, 15000);
+        // Fallback silencioso com polling rápido
+        document.getElementById('connectionStatus')?.remove();
+        setInterval(fetchDashboardData, 3000);
     }
 }
 

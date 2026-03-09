@@ -5,9 +5,15 @@ Sistema de Gestão Billá Burger
 
 from pathlib import Path
 import os
+import socket
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Detecta se está rodando como executável PyInstaller
+if getattr(sys, 'frozen', False):
+    BASE_DIR = Path(sys.executable).resolve().parent / '_internal'
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-billar-burger-change-this-in-production')
@@ -17,6 +23,26 @@ DEBUG = os.getenv('DJANGO_DEBUG', 'true').strip().lower() == 'true'
 
 raw_allowed_hosts = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').strip()
 ALLOWED_HOSTS = [host.strip() for host in raw_allowed_hosts.split(',') if host.strip()]
+
+# Detecta IP local automaticamente para acesso em rede local
+def get_local_ip():
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.connect(('8.8.8.8', 80))
+        ip = sock.getsockname()[0]
+        sock.close()
+        return ip
+    except Exception:
+        return None
+
+local_ip = get_local_ip()
+if local_ip and local_ip not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(local_ip)
+
+# Aceita qualquer IP local em modo executável (para facilitar acesso em rede)
+if getattr(sys, 'frozen', False):
+    ALLOWED_HOSTS.append('*')
+
 ENABLE_REALTIME = os.getenv('ENABLE_REALTIME', 'true').strip().lower() == 'true'
 
 # Em desenvolvimento (localhost + Codespaces), aceitar variações de host/porta
@@ -179,12 +205,12 @@ USE_I18N = True
 USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type

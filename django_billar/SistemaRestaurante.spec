@@ -54,6 +54,17 @@ db_data = []
 if db_file.exists():
     db_data.append((str(db_file), '.'))
 
+# Media files (product images, settings)
+media_datas = []
+media_dir = BASE_DIR / 'media'
+if media_dir.exists():
+    for root, dirs, files in os.walk(media_dir):
+        for file in files:
+            if not file.startswith('.'):
+                src = Path(root) / file
+                dest_dir = Path(root).relative_to(BASE_DIR)
+                media_datas.append((str(src), str(dest_dir)))
+
 # .env.example
 env_example = BASE_DIR / '.env.example'
 env_data = []
@@ -61,7 +72,7 @@ if env_example.exists():
     env_data.append((str(env_example), '.'))
 
 # Combine all data files
-datas = templates_datas + static_datas + migrations_datas + db_data + env_data + [
+datas = templates_datas + static_datas + migrations_datas + media_datas + db_data + env_data + [
     (str(BASE_DIR / 'requirements.txt'), '.'),
 ]
 
@@ -88,6 +99,12 @@ hiddenimports = [
     'psycopg2',
     'qrcode',
     'PIL',
+    'crispy_forms',
+    'crispy_forms.templatetags',
+    'crispy_forms.templatetags.crispy_forms_tags',
+    'crispy_forms.templatetags.crispy_forms_field',
+    'crispy_bootstrap5',
+    'crispy_bootstrap5.bootstrap5',
     'billar_project',
     'billar_project.settings',
     'billar_project.urls',

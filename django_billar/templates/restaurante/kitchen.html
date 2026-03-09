@@ -168,11 +168,24 @@
         socket.onclose = function() {
             setTimeout(connectOrdersSocket, 3000);
         };
+        
+        socket.onerror = function() {
+            // WebSocket falhou, usar polling rápido
+            if (!window.kitchenPolling) {
+                window.kitchenPolling = true;
+                setInterval(() => location.reload(), 3000);
+            }
+        };
     }
 
     connectOrdersSocket();
 
-    // Fallback caso websocket esteja indisponível
-    setInterval(() => location.reload(), 15000);
+    // Timeout: se não conectar em 5s, usar polling
+    setTimeout(() => {
+        if (!window.kitchenPolling) {
+            window.kitchenPolling = true;
+            setInterval(() => location.reload(), 3000);
+        }
+    }, 5000);
 </script>
 {% endblock %}
