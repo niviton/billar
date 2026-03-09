@@ -295,25 +295,19 @@ function connectAdminDashboardSocket() {
             console.log('Dashboard WebSocket closed:', e.code, e.reason);
             adminDashboardSocket = null;
             
-            if (adminReconnectAttempts < adminMaxReconnectAttempts) {
-                adminReconnectAttempts++;
-                const delay = Math.min(1000 * Math.pow(2, adminReconnectAttempts), 10000);
-                
-                adminReconnectTimeout = setTimeout(() => {
-                    connectAdminDashboardSocket();
-                }, delay);
-            } else {
-                // Fallback silencioso com polling rápido
-                document.getElementById('connectionStatus')?.remove();
-                setInterval(fetchDashboardData, 3000);
-            }
+            // Reconecta automaticamente via WebSocket
+            adminReconnectAttempts++;
+            const delay = Math.min(1000 * Math.pow(2, adminReconnectAttempts), 30000);
+            
+            adminReconnectTimeout = setTimeout(() => {
+                connectAdminDashboardSocket();
+            }, delay);
         };
         
     } catch (error) {
         console.error('Error creating dashboard WebSocket:', error);
-        // Fallback silencioso com polling rápido
-        document.getElementById('connectionStatus')?.remove();
-        setInterval(fetchDashboardData, 3000);
+        // Tenta reconectar via WebSocket
+        setTimeout(connectAdminDashboardSocket, 5000);
     }
 }
 

@@ -658,25 +658,19 @@ function connectWaiterSocket() {
             console.log('Waiter WebSocket closed:', e.code);
             waiterSocket = null;
             
-            if (waiterReconnectAttempts < waiterMaxReconnectAttempts) {
-                waiterReconnectAttempts++;
-                const delay = Math.min(1000 * Math.pow(2, waiterReconnectAttempts), 10000);
-                
-                waiterReconnectTimeout = setTimeout(() => {
-                    connectWaiterSocket();
-                }, delay);
-            } else {
-                // Fallback silencioso com polling rápido
-                document.getElementById('waiterConnectionStatus')?.remove();
-                setInterval(fetchWaiterActiveOrders, 3000);
-            }
+            // Reconecta automaticamente via WebSocket
+            waiterReconnectAttempts++;
+            const delay = Math.min(1000 * Math.pow(2, waiterReconnectAttempts), 30000);
+            
+            waiterReconnectTimeout = setTimeout(() => {
+                connectWaiterSocket();
+            }, delay);
         };
         
     } catch (error) {
         console.error('Error creating waiter WebSocket:', error);
-        // Fallback silencioso com polling rápido
-        document.getElementById('waiterConnectionStatus')?.remove();
-        setInterval(fetchWaiterActiveOrders, 3000);
+        // Tenta reconectar via WebSocket
+        setTimeout(connectWaiterSocket, 5000);
     }
 }
 

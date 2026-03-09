@@ -173,12 +173,10 @@ else:
 REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1')
 
 if ENABLE_REALTIME and HAS_CHANNELS:
+    # Usa InMemoryChannelLayer para funcionar sem Redis
     CHANNEL_LAYERS = {
         'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                'hosts': [REDIS_URL],
-            },
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
         },
     }
 
