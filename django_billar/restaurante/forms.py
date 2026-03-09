@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from .models import User, Category, Product, Order, OrderItem, AppSettings
+from .models import User, Category, Product, Order, OrderItem, AppSettings, Ingredient
 
 
 class LoginForm(AuthenticationForm):
@@ -46,14 +46,29 @@ class ProductForm(forms.ModelForm):
     """Formulário de produto"""
     class Meta:
         model = Product
-        fields = ['name', 'category', 'price', 'stock', 'icon', 'image', 'is_active']
+        fields = ['name', 'category', 'price', 'stock', 'use_ingredient_stock', 'icon', 'image', 'is_active']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'category': forms.Select(attrs={'class': 'form-control'}),
             'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'stock': forms.NumberInput(attrs={'class': 'form-control'}),
+            'stock': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'use_ingredient_stock': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'icon': forms.TextInput(attrs={'class': 'form-control', 'maxlength': '10'}),
             'image': forms.FileInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class IngredientForm(forms.ModelForm):
+    """Formulário de ingrediente"""
+    class Meta:
+        model = Ingredient
+        fields = ['name', 'unit', 'stock_quantity', 'cost_price', 'is_active']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'unit': forms.Select(attrs={'class': 'form-control'}),
+            'stock_quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001', 'min': '0'}),
+            'cost_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 

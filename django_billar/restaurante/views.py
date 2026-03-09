@@ -7,14 +7,20 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
 from django.db.models import Sum, Count, Avg
 from django.db.models.functions import TruncDay, TruncWeek, TruncMonth
+from django.db import transaction
+from django.core.exceptions import PermissionDenied
+from django.core.validators import validate_slug
+from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
 from datetime import timedelta, date
+from decimal import Decimal, InvalidOperation
 import json
 
-from .models import User, Category, Product, Order, OrderItem, AppSettings
+from .models import User, Category, Product, Order, OrderItem, AppSettings, Ingredient, ProductIngredient
 from .forms import (
     LoginForm, UserForm, CategoryForm, ProductForm, 
-    OrderForm, DeliveryOrderForm, PaymentForm, AppSettingsForm
+    OrderForm, DeliveryOrderForm, PaymentForm, AppSettingsForm, IngredientForm
 )
 
 
@@ -39,6 +45,77 @@ def enrich_delivery_order_display(order):
     else:
         order.platform_name = after_prefix.strip()
         order.display_observacoes = ''
+
+
+def cart_qty_for_product(cart, product_id):
+    for item in cart:
+        if item['id'] == product_id:
+            return item['qty']
+    return 0
+
+
+def validate_cart_ingredient_stock(cart):
+    products = Product.objects.filter(id__in=[item['id'] for item in cart]).prefetch_related('recipe_items__ingredient')
+    products_by_id = {product.id: product for product in products}
+
+    for cart_item in cart:
+        product = products_by_id.get(cart_item['id'])
+        if not product:
+            return f"Produto inválido no carrinho: ID {cart_item['id']}"
+        if not product.can_make(cart_item['qty']):
+            return f'Estoque insuficiente para {product.name}.'
+    return None
+
+
+def save_product_recipe_from_request(product, request):
+    if not product.use_ingredient_stock:
+        return 0
+
+    ingredient_ids = request.POST.getlist('recipe_ingredient[]')
+    quantities = request.POST.getlist('recipe_quantity[]')
+
+    ProductIngredient.objects.filter(product=product).delete()
+
+    recipe_rows = []
+    for ingredient_id, quantity_raw in zip(ingredient_ids, quantities):
+        ingredient_id = str(ingredient_id).strip()
+        quantity_raw = str(quantity_raw).strip()
+        if not ingredient_id or not quantity_raw:
+            continue
+
+        try:
+            quantity = Decimal(quantity_raw)
+        except InvalidOperation:
+            continue
+
+        if quantity <= 0:
+            continue
+
+        recipe_rows.append((int(ingredient_id), quantity))
+
+    if not recipe_rows:
+        return 0
+
+    ingredients_map = {
+        ingredient.id: ingredient
+        for ingredient in Ingredient.objects.filter(id__in=[row[0] for row in recipe_rows], is_active=True)
+    }
+
+    created_ingredient_ids = set()
+    for ingredient_id, quantity in recipe_rows:
+        if ingredient_id in created_ingredient_ids:
+            continue
+        ingredient = ingredients_map.get(ingredient_id)
+        if not ingredient:
+            continue
+        ProductIngredient.objects.create(
+            product=product,
+            ingredient=ingredient,
+            quantity=quantity,
+        )
+        created_ingredient_ids.add(ingredient_id)
+
+    return len(created_ingredient_ids)
 
 
 @never_cache
@@ -93,7 +170,11 @@ def redirect_order_entry(request):
 @login_required
 def waiter_view(request):
     """View principal do garçom"""
-    categories = Category.objects.prefetch_related('products').all()
+    if request.user.role == 'cozinha':
+        messages.error(request, 'Acesso não autorizado')
+        return redirect('kitchen_view')
+
+    categories = Category.objects.prefetch_related('products__recipe_items__ingredient').all()
     active_orders = Order.objects.filter(
         status__in=['cozinha', 'pronto']
     ).order_by('-created_at')
@@ -116,7 +197,8 @@ def add_to_cart(request, product_id):
     """Adicionar produto ao carrinho"""
     product = get_object_or_404(Product, id=product_id)
     
-    if product.stock <= 0:
+    available_stock = product.available_stock
+    if available_stock <= 0:
         messages.error(request, 'Produto sem estoque')
         return redirect_order_entry(request)
     
@@ -125,7 +207,7 @@ def add_to_cart(request, product_id):
     # Verificar se já existe no carrinho
     for item in cart:
         if item['id'] == product_id:
-            if item['qty'] >= product.stock:
+            if item['qty'] >= available_stock:
                 messages.error(request, 'Limite de estoque atingido')
                 return redirect_order_entry(request)
             item['qty'] += 1
@@ -215,64 +297,78 @@ def submit_order(request):
                     mesa=mesa, 
                     status__in=['cozinha', 'pronto']
                 ).first()
+
+            stock_error = validate_cart_ingredient_stock(cart)
+            if stock_error:
+                messages.error(request, f'❌ {stock_error}')
+                return redirect_order_entry(request)
+
+            product_ids = [item['id'] for item in cart]
+            products_by_id = Product.objects.in_bulk(product_ids)
         
-            if active_order:
+            with transaction.atomic():
+                if active_order:
                 # Adicionar itens ao pedido existente
-                for cart_item in cart:
-                    product = Product.objects.get(id=cart_item['id'])
-                    existing_item = active_order.items.filter(product=product).first()
-                    
-                    if existing_item:
-                        existing_item.quantity += cart_item['qty']
-                        existing_item.pending_quantity += cart_item['qty']
-                        existing_item.save()
-                    else:
+                    existing_items = {
+                        item.product_id: item
+                        for item in active_order.items.select_related('product').all()
+                    }
+
+                    for cart_item in cart:
+                        product = products_by_id.get(cart_item['id'])
+                        if not product:
+                            raise ValueError(f"Produto inválido: {cart_item['id']}")
+                        existing_item = existing_items.get(product.id)
+
+                        if existing_item:
+                            existing_item.quantity += cart_item['qty']
+                            existing_item.pending_quantity += cart_item['qty']
+                            existing_item.save()
+                        else:
+                            OrderItem.objects.create(
+                                order=active_order,
+                                product=product,
+                                quantity=cart_item['qty'],
+                                pending_quantity=cart_item['qty'],
+                                unit_price=product.price
+                            )
+
+                        product.consume_ingredients(cart_item['qty'])
+
+                    active_order.status = 'cozinha'
+                    if observacoes:
+                        active_order.observacoes = (active_order.observacoes + " | " + observacoes) if active_order.observacoes else observacoes
+                    active_order.calculate_total()
+                    sync_order_kitchen_status(active_order)
+                    messages.success(request, f'✅ Pedido atualizado para mesa {mesa}')
+                else:
+                # Criar novo pedido
+                    total = sum(item['price'] * item['qty'] for item in cart)
+                    order = Order.objects.create(
+                        mesa=mesa,
+                        cliente=cliente,
+                        observacoes=observacoes,
+                        total=total,
+                        status='cozinha',
+                        order_type=order_type,
+                        address=address,
+                        waiter=request.user
+                    )
+
+                    for cart_item in cart:
+                        product = products_by_id.get(cart_item['id'])
+                        if not product:
+                            raise ValueError(f"Produto inválido: {cart_item['id']}")
                         OrderItem.objects.create(
-                            order=active_order,
+                            order=order,
                             product=product,
                             quantity=cart_item['qty'],
                             pending_quantity=cart_item['qty'],
                             unit_price=product.price
                         )
-                    
-                    # Atualizar estoque
-                    product.stock -= cart_item['qty']
-                    product.save()
-                
-                active_order.status = 'cozinha'
-                if observacoes:
-                    active_order.observacoes = (active_order.observacoes + " | " + observacoes) if active_order.observacoes else observacoes
-                active_order.calculate_total()
-                sync_order_kitchen_status(active_order)
-                messages.success(request, f'✅ Pedido atualizado para mesa {mesa}')
-            else:
-                # Criar novo pedido
-                total = sum(item['price'] * item['qty'] for item in cart)
-                order = Order.objects.create(
-                    mesa=mesa,
-                    cliente=cliente,
-                    observacoes=observacoes,
-                    total=total,
-                    status='cozinha',
-                    order_type=order_type,
-                    address=address,
-                    waiter=request.user
-                )
-                
-                for cart_item in cart:
-                    product = Product.objects.get(id=cart_item['id'])
-                    OrderItem.objects.create(
-                        order=order,
-                        product=product,
-                        quantity=cart_item['qty'],
-                        pending_quantity=cart_item['qty'],
-                        unit_price=product.price
-                    )
-                    # Atualizar estoque
-                    product.stock -= cart_item['qty']
-                    product.save()
-                
-                messages.success(request, f'✅ Pedido #{order.id} enviado para a cozinha!')
+                        product.consume_ingredients(cart_item['qty'])
+
+                    messages.success(request, f'✅ Pedido #{order.id} enviado para a cozinha!')
             
             # Limpar carrinho
             request.session['cart'] = []
@@ -296,6 +392,21 @@ def redirect_by_role(request):
 
 def can_manage_order(user):
     return user.role != 'cozinha'
+
+
+def can_access_order(user, order):
+    if user.role == 'gerente':
+        return True
+    if user.role == 'garcom':
+        return order.waiter_id == user.id
+    return False
+
+
+def get_order_for_user_or_403(user, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    if not can_access_order(user, order):
+        raise PermissionDenied('Você não tem permissão para acessar este pedido.')
+    return order
 
 
 def is_ajax_request(request):
@@ -345,13 +456,14 @@ def manage_order(request, order_id):
         messages.error(request, 'Acesso não autorizado')
         return redirect_by_role(request)
 
-    order = get_object_or_404(Order.objects.prefetch_related('items__product'), id=order_id)
+    order = get_order_for_user_or_403(request.user, order_id)
+    order = Order.objects.prefetch_related('items__product').get(id=order.id)
 
     if order.status in ['finalizado', 'cancelado']:
         messages.error(request, 'Não é possível alterar um pedido finalizado/cancelado.')
         return redirect_by_role(request)
 
-    categories = Category.objects.prefetch_related('products').all()
+    categories = Category.objects.prefetch_related('products__recipe_items__ingredient').all()
     context = {
         'order': order,
         'categories': categories,
@@ -367,7 +479,7 @@ def update_order_info(request, order_id):
         messages.error(request, 'Acesso não autorizado')
         return redirect_by_role(request)
 
-    order = get_object_or_404(Order, id=order_id)
+    order = get_order_for_user_or_403(request.user, order_id)
     if order.status in ['finalizado', 'cancelado']:
         messages.error(request, 'Pedido não pode mais ser alterado.')
         return redirect_by_role(request)
@@ -410,7 +522,7 @@ def add_product_to_order(request, order_id, product_id):
         messages.error(request, 'Acesso não autorizado')
         return redirect_by_role(request)
 
-    order = get_object_or_404(Order, id=order_id)
+    order = get_order_for_user_or_403(request.user, order_id)
     product = get_object_or_404(Product, id=product_id)
 
     if order.status in ['finalizado', 'cancelado']:
@@ -419,7 +531,7 @@ def add_product_to_order(request, order_id, product_id):
         messages.error(request, 'Pedido não pode mais ser alterado.')
         return redirect('manage_order', order_id=order.id)
 
-    if product.stock <= 0:
+    if product.available_stock <= 0:
         if is_ajax_request(request):
             return JsonResponse({'success': False, 'message': 'Produto sem estoque.'}, status=400)
         messages.error(request, 'Produto sem estoque.')
@@ -439,8 +551,7 @@ def add_product_to_order(request, order_id, product_id):
             unit_price=product.price
         )
 
-    product.stock -= 1
-    product.save(update_fields=['stock'])
+    product.consume_ingredients(1)
     order.calculate_total()
     sync_order_kitchen_status(order)
 
@@ -464,7 +575,7 @@ def change_order_item_qty(request, order_id, item_id):
         messages.error(request, 'Acesso não autorizado')
         return redirect_by_role(request)
 
-    order = get_object_or_404(Order, id=order_id)
+    order = get_order_for_user_or_403(request.user, order_id)
     order_item = get_object_or_404(OrderItem, id=item_id, order=order)
 
     if order.status in ['finalizado', 'cancelado']:
@@ -477,31 +588,28 @@ def change_order_item_qty(request, order_id, item_id):
     product = order_item.product
 
     if action == 'add':
-        if product.stock <= 0:
+        if product.available_stock <= 0:
             if is_ajax_request(request):
                 return JsonResponse({'success': False, 'message': 'Produto sem estoque.'}, status=400)
             messages.error(request, 'Produto sem estoque.')
             return redirect('manage_order', order_id=order.id)
         order_item.quantity += 1
         order_item.pending_quantity += 1
-        product.stock -= 1
+        product.consume_ingredients(1)
         order_item.save(update_fields=['quantity', 'pending_quantity'])
-        product.save(update_fields=['stock'])
 
     elif action == 'remove':
         order_item.quantity -= 1
         if order_item.pending_quantity > 0:
             order_item.pending_quantity -= 1
-        product.stock += 1
+        product.restore_ingredients(1)
         if order_item.quantity <= 0:
             order_item.delete()
         else:
             order_item.save(update_fields=['quantity', 'pending_quantity'])
-        product.save(update_fields=['stock'])
 
     elif action == 'delete':
-        product.stock += order_item.quantity
-        product.save(update_fields=['stock'])
+        product.restore_ingredients(order_item.quantity)
         order_item.delete()
 
     else:
@@ -530,6 +638,10 @@ def change_order_item_qty(request, order_id, item_id):
 @login_required
 def kitchen_view(request):
     """View da cozinha"""
+    if request.user.role not in ['cozinha', 'gerente']:
+        messages.error(request, 'Acesso não autorizado')
+        return redirect('dashboard')
+
     now = timezone.now()
     threshold_time = now - timedelta(minutes=15)  # Pedidos com mais de 15 min
     
@@ -566,6 +678,10 @@ def kitchen_view(request):
 @require_POST
 def mark_order_ready(request, order_id):
     """Marcar pedido como pronto"""
+    if request.user.role not in ['cozinha', 'gerente']:
+        messages.error(request, 'Acesso não autorizado')
+        return redirect('dashboard')
+
     order = get_object_or_404(Order, id=order_id)
     order.items.update(pending_quantity=0)
     order.status = 'pronto'
@@ -609,11 +725,11 @@ def admin_dashboard(request):
         order_type='dine-in'
     ).values('mesa').distinct().count()
     
-    # Alertas de estoque baixo (produtos com menos de 10 unidades)
-    low_stock_products = Product.objects.filter(
-        stock__lt=10,
+    # Alertas de estoque baixo (ingredientes com menos de 10 unidades)
+    low_stock_ingredients = Ingredient.objects.filter(
+        stock_quantity__lt=10,
         is_active=True
-    ).order_by('stock')[:5]
+    ).order_by('stock_quantity')[:5]
     
     # Top 5 produtos
     top_products = OrderItem.objects.filter(
@@ -631,7 +747,7 @@ def admin_dashboard(request):
         'active_orders': active_orders,
         'top_products': top_products,
         'mesas_ativas': mesas_ativas,
-        'low_stock_products': low_stock_products,
+        'low_stock_ingredients': low_stock_ingredients,
         'active_menu': 'dashboard',
     }
     return render(request, 'restaurante/admin/dashboard.html', context)
@@ -763,7 +879,7 @@ def admin_menu(request):
     if request.user.role != 'gerente':
         return redirect('dashboard')
     
-    categories = Category.objects.prefetch_related('products').all()
+    categories = Category.objects.prefetch_related('products__recipe_items__ingredient').all()
     
     context = {
         'categories': categories,
@@ -781,14 +897,22 @@ def product_create(request):
     if request.method == 'POST':
         form = ProductForm(request.POST, request.FILES)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Produto criado com sucesso!')
-            return redirect('admin_menu')
+            try:
+                with transaction.atomic():
+                    product = form.save()
+                    recipe_count = save_product_recipe_from_request(product, request)
+                    if product.use_ingredient_stock and recipe_count == 0:
+                        raise ValueError('Defina ao menos 1 ingrediente na receita para usar estoque por ingredientes.')
+                messages.success(request, 'Produto criado com sucesso!')
+                return redirect('admin_menu')
+            except ValueError as exc:
+                messages.error(request, str(exc))
     else:
         form = ProductForm()
     
     categories = Category.objects.all()
-    return render(request, 'restaurante/admin/product_form.html', {'form': form, 'title': 'Novo Produto', 'active_menu': 'menu', 'categories': categories})
+    ingredients = Ingredient.objects.filter(is_active=True).order_by('name')
+    return render(request, 'restaurante/admin/product_form.html', {'form': form, 'title': 'Novo Produto', 'active_menu': 'menu', 'categories': categories, 'ingredients': ingredients, 'recipe_items': []})
 
 
 @login_required
@@ -802,17 +926,27 @@ def product_edit(request, product_id):
     if request.method == 'POST':
         form = ProductForm(request.POST, request.FILES, instance=product)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Produto atualizado!')
-            return redirect('admin_menu')
+            try:
+                with transaction.atomic():
+                    product = form.save()
+                    recipe_count = save_product_recipe_from_request(product, request)
+                    if product.use_ingredient_stock and recipe_count == 0:
+                        raise ValueError('Defina ao menos 1 ingrediente na receita para usar estoque por ingredientes.')
+                messages.success(request, 'Produto atualizado!')
+                return redirect('admin_menu')
+            except ValueError as exc:
+                messages.error(request, str(exc))
     else:
         form = ProductForm(instance=product)
     
     categories = Category.objects.all()
-    return render(request, 'restaurante/admin/product_form.html', {'form': form, 'title': 'Editar Produto', 'product': product, 'active_menu': 'menu', 'categories': categories})
+    ingredients = Ingredient.objects.filter(is_active=True).order_by('name')
+    recipe_items = product.recipe_items.select_related('ingredient').all().order_by('ingredient__name')
+    return render(request, 'restaurante/admin/product_form.html', {'form': form, 'title': 'Editar Produto', 'product': product, 'active_menu': 'menu', 'categories': categories, 'ingredients': ingredients, 'recipe_items': recipe_items})
 
 
 @login_required
+@require_POST
 def product_delete(request, product_id):
     """Deletar produto"""
     if request.user.role != 'gerente':
@@ -869,6 +1003,7 @@ def category_edit(request, category_id):
 
 
 @login_required
+@require_POST
 def category_delete(request, category_id):
     """Deletar categoria"""
     if request.user.role != 'gerente':
@@ -878,6 +1013,79 @@ def category_delete(request, category_id):
     category.delete()
     messages.success(request, 'Categoria removida!')
     return redirect('admin_menu')
+
+
+@login_required
+def admin_ingredients(request):
+    """Gestão de ingredientes"""
+    if request.user.role != 'gerente':
+        return redirect('dashboard')
+
+    ingredients = Ingredient.objects.all().order_by('name')
+    context = {
+        'ingredients': ingredients,
+        'active_menu': 'ingredients',
+    }
+    return render(request, 'restaurante/admin/ingredients.html', context)
+
+
+@login_required
+def ingredient_create(request):
+    """Criar ingrediente"""
+    if request.user.role != 'gerente':
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        form = IngredientForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Ingrediente criado com sucesso!')
+            return redirect('admin_ingredients')
+    else:
+        form = IngredientForm()
+
+    return render(request, 'restaurante/admin/ingredient_form.html', {
+        'form': form,
+        'title': 'Novo Ingrediente',
+        'active_menu': 'ingredients',
+    })
+
+
+@login_required
+def ingredient_edit(request, ingredient_id):
+    """Editar ingrediente"""
+    if request.user.role != 'gerente':
+        return redirect('dashboard')
+
+    ingredient = get_object_or_404(Ingredient, id=ingredient_id)
+    if request.method == 'POST':
+        form = IngredientForm(request.POST, instance=ingredient)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Ingrediente atualizado!')
+            return redirect('admin_ingredients')
+    else:
+        form = IngredientForm(instance=ingredient)
+
+    return render(request, 'restaurante/admin/ingredient_form.html', {
+        'form': form,
+        'title': 'Editar Ingrediente',
+        'ingredient': ingredient,
+        'active_menu': 'ingredients',
+    })
+
+
+@login_required
+@require_POST
+def ingredient_delete(request, ingredient_id):
+    """Remover ingrediente"""
+    if request.user.role != 'gerente':
+        return redirect('dashboard')
+
+    ingredient = get_object_or_404(Ingredient, id=ingredient_id)
+    ingredient.delete()
+    messages.success(request, 'Ingrediente removido!')
+    return redirect('admin_ingredients')
 
 
 @login_required
@@ -905,18 +1113,33 @@ def user_create(request):
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
         role = request.POST.get('role', 'garcom')
+        if role not in ['garcom', 'cozinha', 'gerente']:
+            messages.error(request, '❌ Função inválida.')
+            return redirect('user_create')
         
         # Validações
         if not username:
             messages.error(request, '❌ Informe o nome de usuário')
+            return redirect('user_create')
+
+        try:
+            validate_slug(username)
+        except ValidationError:
+            messages.error(request, '❌ Usuário inválido. Use apenas letras, números, hífen ou underline.')
             return redirect('user_create')
         
         if User.objects.filter(username=username).exists():
             messages.error(request, '❌ Este usuário já existe')
             return redirect('user_create')
         
-        if not password or len(password) < 4:
-            messages.error(request, '❌ A senha deve ter pelo menos 4 caracteres')
+        if not password:
+            messages.error(request, '❌ Informe a senha')
+            return redirect('user_create')
+
+        try:
+            validate_password(password)
+        except ValidationError as exc:
+            messages.error(request, '❌ ' + ' '.join(exc.messages))
             return redirect('user_create')
         
         # Criar usuário
@@ -936,6 +1159,7 @@ def user_create(request):
 
 
 @login_required
+@require_POST
 def user_delete(request, user_id):
     """Deletar usuário"""
     if request.user.role != 'gerente':
@@ -997,35 +1221,45 @@ def admin_online_orders(request):
         
         observacoes = f"Plataforma: {platform} | {observacoes}" if observacoes else f"Plataforma: {platform}"
 
-        total = sum(item['price'] * item['qty'] for item in cart)
-        order = Order.objects.create(
-            mesa='DELIVERY',
-            cliente=cliente,
-            observacoes=observacoes,
-            total=total,
-            status='cozinha',
-            order_type='delivery',
-            address=address,
-            waiter=request.user
-        )
-        
-        for cart_item in cart:
-            product = Product.objects.get(id=cart_item['id'])
-            OrderItem.objects.create(
-                order=order,
-                product=product,
-                quantity=cart_item['qty'],
-                pending_quantity=cart_item['qty'],
-                unit_price=product.price
+        stock_error = validate_cart_ingredient_stock(cart)
+        if stock_error:
+            messages.error(request, stock_error)
+            return redirect('admin_online_orders')
+
+        product_ids = [item['id'] for item in cart]
+        products_by_id = Product.objects.in_bulk(product_ids)
+
+        with transaction.atomic():
+            total = sum(item['price'] * item['qty'] for item in cart)
+            order = Order.objects.create(
+                mesa='DELIVERY',
+                cliente=cliente,
+                observacoes=observacoes,
+                total=total,
+                status='cozinha',
+                order_type='delivery',
+                address=address,
+                waiter=request.user
             )
-            product.stock -= cart_item['qty']
-            product.save()
+
+            for cart_item in cart:
+                product = products_by_id.get(cart_item['id'])
+                if not product:
+                    raise ValueError(f"Produto inválido: {cart_item['id']}")
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    quantity=cart_item['qty'],
+                    pending_quantity=cart_item['qty'],
+                    unit_price=product.price
+                )
+                product.consume_ingredients(cart_item['qty'])
         
         request.session['cart'] = []
         messages.success(request, 'Pedido online enviado!')
         return redirect('admin_online_orders')
     
-    categories = Category.objects.prefetch_related('products').all()
+    categories = Category.objects.prefetch_related('products__recipe_items__ingredient').all()
     cart = request.session.get('cart', [])
     cart_total = sum(item['price'] * item['qty'] for item in cart)
     
@@ -1049,7 +1283,7 @@ def admin_online_orders(request):
 @login_required
 def close_order(request, order_id):
     """Fechar conta / finalizar pedido"""
-    order = get_object_or_404(Order, id=order_id)
+    order = get_order_for_user_or_403(request.user, order_id)
     
     if request.method == 'POST':
         payment_method = request.POST.get('payment_method', 'dinheiro')
@@ -1067,6 +1301,7 @@ def close_order(request, order_id):
 
 
 @login_required
+@require_POST
 def cancel_order(request, order_id):
     """Cancelar pedido"""
     if request.user.role != 'gerente':
@@ -1077,8 +1312,7 @@ def cancel_order(request, order_id):
     
     # Devolver estoque
     for item in order.items.all():
-        item.product.stock += item.quantity
-        item.product.save()
+        item.product.restore_ingredients(item.quantity)
     
     order.status = 'cancelado'
     order.save()
@@ -1089,7 +1323,7 @@ def cancel_order(request, order_id):
 @login_required
 def print_order(request, order_id):
     """Imprimir cupom"""
-    order = get_object_or_404(Order, id=order_id)
+    order = get_order_for_user_or_403(request.user, order_id)
     settings = AppSettings.get_settings()
     
     return render(request, 'restaurante/print_order.html', {
@@ -1106,14 +1340,15 @@ def api_add_to_cart(request, product_id):
     if request.method == 'POST':
         product = get_object_or_404(Product, id=product_id)
         
-        if product.stock <= 0:
+        available_stock = product.available_stock
+        if available_stock <= 0:
             return JsonResponse({'success': False, 'message': 'Produto sem estoque'})
         
         cart = request.session.get('cart', [])
         
         for item in cart:
             if item['id'] == product_id:
-                if item['qty'] >= product.stock:
+                if item['qty'] >= available_stock:
                     return JsonResponse({'success': False, 'message': 'Limite de estoque'})
                 item['qty'] += 1
                 request.session['cart'] = cart
@@ -1173,3 +1408,11 @@ def api_clear_cart(request):
         return JsonResponse({'success': True, 'cart': [], 'total': 0})
 
     return JsonResponse({'success': False})
+
+
+def pwa_manifest(request):
+    return render(request, 'pwa/manifest.webmanifest', content_type='application/manifest+json')
+
+
+def pwa_service_worker(request):
+    return render(request, 'pwa/sw.js', content_type='application/javascript')

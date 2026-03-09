@@ -5,6 +5,7 @@ Ou copie e cole no shell do Django.
 """
 
 from restaurante.models import User, Category, Product, AppSettings
+import os
 
 # Criar configurações padrão
 settings, _ = AppSettings.objects.get_or_create(pk=1)
@@ -17,14 +18,16 @@ print('✓ Configurações criadas')
 
 # Criar usuário gerente
 if not User.objects.filter(username='gerente').exists():
+    admin_password = os.getenv('BILLAR_INIT_ADMIN_PASSWORD', 'admin12345')
     user = User.objects.create_user(
         username='gerente',
-        password='admin',
+        password=admin_password,
         role='gerente',
         is_staff=True,
         is_superuser=True
     )
-    print('✓ Usuário gerente criado (senha: admin)')
+    print('✓ Usuário gerente criado')
+    print(f'  Senha inicial: {admin_password}')
 
 # Criar categorias
 categories_data = [
@@ -69,4 +72,4 @@ print('✓ Produtos criados')
 print('\n🎉 Dados iniciais criados com sucesso!')
 print('   Acesse o sistema com:')
 print('   Usuário: gerente')
-print('   Senha: admin')
+print('   Senha: variável BILLAR_INIT_ADMIN_PASSWORD ou admin12345')

@@ -68,6 +68,11 @@
             <i class="bi bi-bag text-lg {% if active_menu == 'menu' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
             Cardápio
         </a>
+
+        <a href="{% url 'admin_ingredients' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'ingredients' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+            <i class="bi bi-box-seam text-lg {% if active_menu == 'ingredients' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+            Ingredientes
+        </a>
         
         <a href="{% url 'admin_users' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'users' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
             <i class="bi bi-people text-lg {% if active_menu == 'users' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>

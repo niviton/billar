@@ -10,12 +10,14 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-billar-burger-change-this-in-production'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-billar-burger-change-this-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'true').strip().lower() == 'true'
 
-ALLOWED_HOSTS = ['*']
+raw_allowed_hosts = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').strip()
+ALLOWED_HOSTS = [host.strip() for host in raw_allowed_hosts.split(',') if host.strip()]
+ENABLE_REALTIME = os.getenv('ENABLE_REALTIME', 'true').strip().lower() == 'true'
 
 # Em desenvolvimento (localhost + Codespaces), aceitar variações de host/porta
 # evita falhas intermitentes de CSRF no login e nos POSTs AJAX.
@@ -50,6 +52,21 @@ if os.getenv('CODESPACES', '').lower() == 'true':
     CSRF_COOKIE_SECURE = False
     SESSION_COOKIE_SECURE = False
 
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = 'DENY'
+    SECURE_REFERRER_POLICY = 'same-origin'
+
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -62,6 +79,15 @@ INSTALLED_APPS = [
     'crispy_bootstrap5',
     'restaurante',
 ]
+
+try:
+    import channels  # noqa: F401
+    HAS_CHANNELS = True
+except Exception:
+    HAS_CHANNELS = False
+
+if ENABLE_REALTIME and HAS_CHANNELS:
+    INSTALLED_APPS.append('channels')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -93,14 +119,42 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'billar_project.wsgi.application'
+ASGI_APPLICATION = 'billar_project.asgi.application'
 
 # Database
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DB_ENGINE = os.getenv('DB_ENGINE', 'sqlite').strip().lower()
+
+if DB_ENGINE == 'postgres':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('POSTGRES_DB', 'billar'),
+            'USER': os.getenv('POSTGRES_USER', 'billar'),
+            'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
+            'HOST': os.getenv('POSTGRES_HOST', '127.0.0.1'),
+            'PORT': os.getenv('POSTGRES_PORT', '5432'),
+            'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '60')),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+
+REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1')
+
+if ENABLE_REALTIME and HAS_CHANNELS:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [REDIS_URL],
+            },
+        },
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

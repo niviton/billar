@@ -29,9 +29,12 @@
             <a href="{% url 'category_edit' category.id %}" class="text-slate-400 hover:text-slate-600 transition-all">
                 <i class="bi bi-pencil"></i>
             </a>
-            <a href="{% url 'category_delete' category.id %}" class="text-slate-400 hover:text-red-600 transition-all">
-                <i class="bi bi-trash"></i>
-            </a>
+            <form method="post" action="{% url 'category_delete' category.id %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="text-slate-400 hover:text-red-600 transition-all" onclick="return confirm('Remover esta categoria?');">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </form>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -48,9 +51,12 @@
                     <div class="flex-1 min-w-0">
                         <h3 class="font-bold text-slate-800 truncate">{{ product.name }}</h3>
                         <p class="text-xl font-black text-slate-800 mt-1">R$ {{ product.price }}</p>
-                        <div class="flex items-center gap-2 mt-2">
-                            <span class="px-2 py-1 rounded-full text-xs font-bold {% if product.stock <= 5 %}bg-red-100 text-red-600{% elif product.stock <= 20 %}bg-amber-100 text-amber-600{% else %}bg-emerald-100 text-emerald-600{% endif %}">
-                                {{ product.stock }} em estoque
+                        <div class="flex flex-col gap-2 mt-2">
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold w-fit max-w-full {% if product.available_stock <= 5 %}bg-red-100 text-red-600{% elif product.available_stock <= 20 %}bg-amber-100 text-amber-600{% else %}bg-emerald-100 text-emerald-600{% endif %}">
+                                {{ product.available_stock }} disponíveis
+                            </span>
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold w-fit max-w-full {% if product.use_ingredient_stock %}bg-indigo-100 text-indigo-700{% else %}bg-slate-100 text-slate-600{% endif %}">
+                                {% if product.use_ingredient_stock %}Ingredientes{% else %}Manual{% endif %}
                             </span>
                         </div>
                     </div>
@@ -59,9 +65,12 @@
                     <a href="{% url 'product_edit' product.id %}" class="flex-1 py-2 bg-slate-100 text-slate-600 rounded-lg text-center text-sm font-bold hover:bg-slate-200 transition-all">
                         <i class="bi bi-pencil me-1"></i>Editar
                     </a>
-                    <a href="{% url 'product_delete' product.id %}" class="py-2 px-3 bg-slate-100 text-slate-400 rounded-lg hover:bg-red-100 hover:text-red-600 transition-all">
-                        <i class="bi bi-trash"></i>
-                    </a>
+                    <form method="post" action="{% url 'product_delete' product.id %}" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="py-2 px-3 bg-slate-100 text-slate-400 rounded-lg hover:bg-red-100 hover:text-red-600 transition-all" onclick="return confirm('Remover este produto?');">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
                 </div>
             </div>
             {% empty %}

@@ -150,8 +150,29 @@
     }
     updateTime();
     setInterval(updateTime, 1000);
-    
-    // Auto-refresh da cozinha a cada 3 segundos
-    setInterval(() => location.reload(), 3000);
+
+    function connectOrdersSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const socketUrl = `${protocol}://${window.location.host}/ws/orders/`;
+        const socket = new WebSocket(socketUrl);
+
+        socket.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type && data.type.startsWith('order.')) {
+                    window.location.reload();
+                }
+            } catch (_) {}
+        };
+
+        socket.onclose = function() {
+            setTimeout(connectOrdersSocket, 3000);
+        };
+    }
+
+    connectOrdersSocket();
+
+    // Fallback caso websocket esteja indisponível
+    setInterval(() => location.reload(), 15000);
 </script>
 {% endblock %}

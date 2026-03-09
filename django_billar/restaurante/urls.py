@@ -2,6 +2,10 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # PWA
+    path('manifest.webmanifest', views.pwa_manifest, name='pwa_manifest'),
+    path('sw.js', views.pwa_service_worker, name='pwa_service_worker'),
+
     # Auth
     path('', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
@@ -26,6 +30,10 @@ urlpatterns = [
     
     # Admin - Cardápio
     path('admin-panel/menu/', views.admin_menu, name='admin_menu'),
+    path('admin-panel/ingredients/', views.admin_ingredients, name='admin_ingredients'),
+    path('admin-panel/ingredient/new/', views.ingredient_create, name='ingredient_create'),
+    path('admin-panel/ingredient/<int:ingredient_id>/edit/', views.ingredient_edit, name='ingredient_edit'),
+    path('admin-panel/ingredient/<int:ingredient_id>/delete/', views.ingredient_delete, name='ingredient_delete'),
     path('admin-panel/product/new/', views.product_create, name='product_create'),
     path('admin-panel/product/<int:product_id>/edit/', views.product_edit, name='product_edit'),
     path('admin-panel/product/<int:product_id>/delete/', views.product_delete, name='product_delete'),

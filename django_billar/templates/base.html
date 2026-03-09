@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="{{ app_settings.primary_color|default:'#ef4444' }}">
     <title>{% block title %}{{ app_settings.store_name }}{% endblock %}</title>
+    <link rel="manifest" href="{% url 'pwa_manifest' %}">
     
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -89,9 +91,9 @@
     
     <!-- Toast Messages -->
     {% if messages %}
-    <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+    <div class="toast-container fixed bottom-4 right-4 z-50 flex flex-col">
         {% for message in messages %}
-        <div class="toast-enter px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 {% if message.tags == 'success' %}bg-emerald-600{% elif message.tags == 'error' %}bg-red-600{% else %}bg-slate-800{% endif %} text-white">
+        <div class="toast-enter px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 {% if message.tags == 'success' %}bg-emerald-600{% elif message.tags == 'error' %}bg-red-600{% else %}bg-slate-800{% endif %} text-white mb-2">
             {% if message.tags == 'success' %}
             <i class="bi bi-check-circle text-lg"></i>
             {% elif message.tags == 'error' %}
@@ -106,7 +108,56 @@
     {% endif %}
     
     <script>
-        // Auto-hide toasts
+        // Toast notification system
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.querySelector('.toast-container') || createToastContainer();
+            
+            const iconMap = {
+                'success': 'bi-check-circle',
+                'error': 'bi-x-circle',
+                'warning': 'bi-exclamation-triangle',
+                'info': 'bi-info-circle'
+            };
+            
+            const colorMap = {
+                'success': 'bg-emerald-600',
+                'error': 'bg-red-600',
+                'warning': 'bg-amber-600',
+                'info': 'bg-slate-800'
+            };
+            
+            const toast = document.createElement('div');
+            toast.className = `toast-enter px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 ${colorMap[type] || colorMap.info} text-white mb-2`;
+            toast.innerHTML = `
+                <i class="bi ${iconMap[type] || iconMap.info} text-lg"></i>
+                <span class="font-medium">${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateY(0)';
+            }, 10);
+            
+            // Animate out and remove
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(20px)';
+                toast.style.transition = 'all 0.3s ease-out';
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+        
+        function createToastContainer() {
+            const container = document.createElement('div');
+            container.className = 'toast-container fixed bottom-4 right-4 z-50 flex flex-col';
+            document.body.appendChild(container);
+            return container;
+        }
+        
+        // Auto-hide Django messages toasts
         document.addEventListener('DOMContentLoaded', function() {
             const toasts = document.querySelectorAll('.toast-enter');
             toasts.forEach(function(toast) {
@@ -117,6 +168,10 @@
                     setTimeout(() => toast.remove(), 300);
                 }, 3000);
             });
+
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('{% url "pwa_service_worker" %}').catch(function() {});
+            }
         });
     </script>
     

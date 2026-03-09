@@ -1,16 +1,40 @@
 # Billá Burger - Sistema de Gestão (Django)
 
-Sistema completo de gestão para restaurantes/lanchonetes desenvolvido em Django.
+Sistema completo de gestão para restaurantes/lanchonetes desenvolvido em Django com **atualizações em tempo real via WebSocket**.
+
+## ✨ Destaques
+
+- 🔄 **Atualizações em Tempo Real**: WebSocket para sincronização instantânea sem recarregar páginas
+- 📱 **PWA (Progressive Web App)**: Instalável em dispositivos móveis
+- 🖥️ **Deploy Windows**: Executável para servidor LAN profissional
+- 🔐 **Segurança**: Hardening completo com autenticação e autorização por recurso
+- ⚡ **Performance**: Queries otimizadas e cache eficiente
 
 ## 📋 Funcionalidades
 
 - **Login com Roles**: Garçom, Cozinha, Gerente
-- **Gestão de Pedidos**: Mesa e Delivery
-- **Cozinha**: Visualização e controle de pedidos
-- **Cardápio**: Categorias e produtos com estoque
+- **Gestão de Pedidos**: Mesa e Delivery com atualização em tempo real
+- **Cozinha**: Visualização e controle de pedidos **em tempo real via WebSocket**
+- **Dashboard do Gerente**: Estatísticas atualizadas automaticamente
+- **Cardápio**: Categorias e produtos com controle de estoque
 - **Relatórios**: Vendas por período, por garçom, produtos mais vendidos
 - **Configurações**: Personalização da loja (nome, logo, cores)
 - **Impressão**: Cupom não-fiscal com QR Code PIX
+- **Notificações**: Toast messages para feedback instantâneo
+
+## 🔄 Recursos em Tempo Real
+
+O sistema utiliza **Django Channels + Redis + WebSocket** para proporcionar:
+
+- ✅ Dashboard do gerente atualiza automaticamente (vendas, pedidos ativos, mesas ocupadas)
+- ✅ Cozinha recebe novos pedidos instantaneamente sem recarregar
+- ✅ Garçons veem atualizações de status dos pedidos em tempo real
+- ✅ Sincronização entre múltiplos usuários simultâneos
+- ✅ Notificações toast para eventos importantes
+- ✅ Indicador de status da conexão em tempo real
+- ✅ Reconexão automática em caso de falha
+
+**Documentação completa:** [docs/REALTIME_FEATURES.md](docs/REALTIME_FEATURES.md)
 
 ## 🚀 Como Executar
 
@@ -65,6 +89,15 @@ python manage.py runserver
 ```
 
 Acesse: http://127.0.0.1:8000
+
+## 🔐 Variáveis de Ambiente (recomendado)
+
+Antes de subir em produção, configure:
+
+- `DJANGO_SECRET_KEY`
+- `DJANGO_DEBUG` (`false` em produção)
+- `DJANGO_ALLOWED_HOSTS` (ex: `meudominio.com,www.meudominio.com`)
+- `BILLAR_INIT_ADMIN_PASSWORD` (senha inicial do usuário gerente no `initial_data.py`)
 
 ## 👤 Usuários Padrão
 
@@ -153,3 +186,120 @@ python manage.py shell
 ## 📄 Licença
 
 Projeto desenvolvido para fins educacionais.
+
+---
+
+## 🏗️ Arquitetura Profissional LAN (Restaurante)
+
+Para uso real diário em restaurante, a recomendação é:
+
+- **Django** (negócio e interfaces)
+- **Waitress** (HTTP WSGI)
+- **Daphne + Django Channels** (WebSocket/tempo real)
+- **Redis** (pub/sub Channels)
+- **PostgreSQL** (banco principal)
+- **Nginx** (reverse proxy para HTTP + WS)
+
+### Fluxo recomendado
+
+- Navegador (garçom/cozinha/gerente) → `Nginx`
+- Rotas HTTP → `Waitress` (`billar_project.wsgi`)
+- Rotas `/ws/` → `Daphne` (`billar_project.asgi`)
+- Eventos em tempo real → `Redis`
+- Persistência de dados → `PostgreSQL`
+
+## ⚙️ Deploy no Windows (servidor local)
+
+### 1) Configurar variáveis
+
+Copie `.env.example` para `.env` e ajuste valores.
+
+### 2) Instalar dependências
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3) Migrar banco
+
+```bash
+python manage.py migrate
+```
+
+### 4) Iniciar pelo launcher
+
+Use:
+
+- `deploy/windows/start_system.bat`
+
+Ou direto:
+
+```bash
+python deploy/windows/launcher.py
+```
+
+### 5) Gerar executável
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy/windows/build_exe.ps1
+```
+
+Saída esperada:
+
+- `dist/SistemaRestaurante.exe`
+
+## 📡 Recursos em Tempo Real
+
+O sistema implementa WebSocket para atualizações em tempo real em todas as telas principais.
+
+**Páginas com atualização automática:**
+- **Dashboard do Gerente** (`/admin/dashboard/`): Stats, pedidos ativos, alertas de estoque
+- **Cozinha** (`/kitchen/`): Novos pedidos aparecem instantaneamente
+- **Garçom** (`/waiter/`): Mesas ativas sincronizadas em tempo real
+
+**WebSocket Endpoint:**
+- `/ws/orders/`
+
+**Eventos publicados:**
+- `order.created`: Novo pedido criado
+- `order.updated`: Pedido modificado
+- `order.status_changed`: Status alterado
+- `order.deleted`: Pedido cancelado
+
+**Sistema de notificações:**
+- Toast messages para feedback visual instantâneo
+- Indicador de status da conexão em tempo real
+- Reconexão automática com exponential backoff
+
+**📚 Documentação completa:** [docs/REALTIME_FEATURES.md](docs/REALTIME_FEATURES.md)
+
+**Requisitos:**
+- Redis rodando: `redis-server`
+- Daphne ASGI server: `daphne -p 8001 billar_project.asgi:application`
+- `ENABLE_REALTIME=True` no `.env`
+
+## 📱 PWA
+
+Recursos adicionados:
+
+- Manifest: `/manifest.webmanifest`
+- Service Worker: `/sw.js`
+- Ícones: `static/pwa/`
+
+Nos celulares, abra o sistema e use **Adicionar à tela inicial**.
+
+## 🔒 Segurança recomendada
+
+- `DJANGO_DEBUG=false` em produção
+- `DJANGO_SECRET_KEY` forte
+- `DJANGO_ALLOWED_HOSTS` restrito ao IP/hostname LAN
+- Usuários separados por função e senhas fortes
+- Rede operacional separada da rede de clientes
+
+## 💾 Backup automático
+
+Script pronto:
+
+- `deploy/windows/backup_postgres.ps1`
+
+Agendar no Windows Task Scheduler (ex.: diariamente às 03:00).

@@ -1,7 +1,0 @@
-{
-  "name": "Billá Burger - Sistema de Gestão",
-  "description": "Sistema completo de PDV, Cozinha e Administração para lanchonetes com persistência de dados e controle de estoque.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}

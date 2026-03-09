@@ -35,9 +35,12 @@
                 </span>
             </div>
             {% if member.username != request.user.username %}
-            <a href="{% url 'user_delete' member.id %}" class="p-3 bg-slate-100 text-slate-400 rounded-xl hover:bg-red-100 hover:text-red-600 transition-all">
-                <i class="bi bi-trash"></i>
-            </a>
+            <form method="post" action="{% url 'user_delete' member.id %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="p-3 bg-slate-100 text-slate-400 rounded-xl hover:bg-red-100 hover:text-red-600 transition-all" onclick="return confirm('Remover este usuário?');">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </form>
             {% else %}
             <span class="px-3 py-1 bg-slate-100 text-slate-400 rounded-full text-xs font-bold">
                 Você

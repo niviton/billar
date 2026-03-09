@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, Category, Product, Order, OrderItem, AppSettings
+from .models import User, Category, Product, Order, OrderItem, AppSettings, Ingredient, ProductIngredient
 
 
 @admin.register(User)
@@ -20,10 +20,25 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'price', 'stock', 'is_active']
+    list_display = ['name', 'category', 'price', 'stock', 'use_ingredient_stock', 'available_stock', 'is_active']
     list_filter = ['category', 'is_active']
-    list_editable = ['price', 'stock', 'is_active']
+    list_editable = ['price', 'stock', 'use_ingredient_stock', 'is_active']
     search_fields = ['name']
+
+
+@admin.register(Ingredient)
+class IngredientAdmin(admin.ModelAdmin):
+    list_display = ['name', 'unit', 'stock_quantity', 'cost_price', 'is_active']
+    list_filter = ['unit', 'is_active']
+    search_fields = ['name']
+    list_editable = ['stock_quantity', 'cost_price', 'is_active']
+
+
+@admin.register(ProductIngredient)
+class ProductIngredientAdmin(admin.ModelAdmin):
+    list_display = ['product', 'ingredient', 'quantity']
+    list_filter = ['ingredient']
+    search_fields = ['product__name', 'ingredient__name']
 
 
 class OrderItemInline(admin.TabularInline):

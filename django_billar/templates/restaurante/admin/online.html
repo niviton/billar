@@ -81,7 +81,7 @@
                        data-cart-action="add"
                        data-product-id="{{ product.id }}"
                        onclick="onlineHandleCartAction('add', '{{ product.id }}'); return false;"
-                       class="group p-4 rounded-2xl border transition-all {% if product.stock > 0 %}bg-white border-slate-200 hover:border-purple-300 hover:shadow-lg hover:-translate-y-1{% else %}bg-slate-100 border-transparent opacity-60 grayscale pointer-events-none{% endif %}">
+                              class="group p-4 rounded-2xl border transition-all {% if product.available_stock > 0 %}bg-white border-slate-200 hover:border-purple-300 hover:shadow-lg hover:-translate-y-1{% else %}bg-slate-100 border-transparent opacity-60 grayscale pointer-events-none{% endif %}">
                         <div class="w-16 h-16 mx-auto mb-3 rounded-full overflow-hidden flex items-center justify-center bg-slate-50">
                             {% if product.image %}
                             <img src="{{ product.image.url }}" class="w-full h-full object-cover" />

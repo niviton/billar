@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from decimal import Decimal, ROUND_FLOOR
 
 
 class User(AbstractUser):
@@ -41,6 +42,7 @@ class Product(models.Model):
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products', verbose_name='Categoria')
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Preço')
     stock = models.IntegerField(default=0, verbose_name='Estoque')
+    use_ingredient_stock = models.BooleanField(default=False, verbose_name='Controlar por ingredientes')
     icon = models.CharField(max_length=10, default='🍽️', verbose_name='Emoji')
     image = models.ImageField(upload_to='products/', blank=True, null=True, verbose_name='Imagem')
     is_active = models.BooleanField(default=True, verbose_name='Ativo')
@@ -51,6 +53,9 @@ class Product(models.Model):
         verbose_name = 'Produto'
         verbose_name_plural = 'Produtos'
         ordering = ['category', 'name']
+        constraints = [
+            models.CheckConstraint(check=models.Q(stock__gte=0), name='product_stock_non_negative'),
+        ]
 
     def __str__(self):
         return f"{self.icon} {self.name}"
@@ -60,6 +65,122 @@ class Product(models.Model):
         if self.image:
             return self.image.url
         return self.icon
+
+    @property
+    def has_recipe(self):
+        return self.recipe_items.exists()
+
+    @property
+    def available_stock(self):
+        if not self.use_ingredient_stock:
+            return max(self.stock, 0)
+
+        recipe_items = list(self.recipe_items.select_related('ingredient').all())
+        if not recipe_items:
+            return 0
+
+        possible_units = []
+        for recipe_item in recipe_items:
+            ingredient_stock = recipe_item.ingredient.stock_quantity
+            needed = recipe_item.quantity
+            if needed <= 0:
+                continue
+            units = int((ingredient_stock / needed).to_integral_value(rounding=ROUND_FLOOR))
+            possible_units.append(max(units, 0))
+
+        if not possible_units:
+            return 0
+        return min(possible_units)
+
+    def can_make(self, quantity):
+        return self.available_stock >= quantity
+
+    def consume_ingredients(self, quantity):
+        quantity = Decimal(str(quantity))
+        if not self.use_ingredient_stock:
+            if self.stock < int(quantity):
+                raise ValueError(f'Estoque insuficiente para {self.name}.')
+            self.stock -= int(quantity)
+            self.save(update_fields=['stock', 'updated_at'])
+            return
+
+        recipe_items = list(self.recipe_items.select_related('ingredient').all())
+        if not recipe_items:
+            raise ValueError(f'Receita não definida para {self.name}.')
+            
+        if not self.can_make(quantity):
+            raise ValueError(f'Estoque insuficiente para {self.name}.')
+
+        for recipe_item in recipe_items:
+            required = recipe_item.quantity * quantity
+            ingredient = recipe_item.ingredient
+            ingredient.stock_quantity -= required
+            ingredient.save(update_fields=['stock_quantity', 'updated_at'])
+
+    def restore_ingredients(self, quantity):
+        quantity = Decimal(str(quantity))
+        if not self.use_ingredient_stock:
+            self.stock += int(quantity)
+            self.save(update_fields=['stock', 'updated_at'])
+            return
+
+        recipe_items = list(self.recipe_items.select_related('ingredient').all())
+        if not recipe_items:
+            return
+
+        for recipe_item in recipe_items:
+            ingredient = recipe_item.ingredient
+            ingredient.stock_quantity += recipe_item.quantity * quantity
+            ingredient.save(update_fields=['stock_quantity', 'updated_at'])
+
+
+class Ingredient(models.Model):
+    """Ingrediente base para produção de produtos"""
+    UNIT_CHOICES = [
+        ('un', 'Unidade'),
+        ('g', 'Gramas'),
+        ('kg', 'Quilos'),
+        ('ml', 'Mililitros'),
+        ('l', 'Litros'),
+    ]
+
+    name = models.CharField(max_length=120, unique=True, verbose_name='Nome')
+    unit = models.CharField(max_length=10, choices=UNIT_CHOICES, default='un', verbose_name='Unidade')
+    stock_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=0, verbose_name='Estoque')
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Custo')
+    is_active = models.BooleanField(default=True, verbose_name='Ativo')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Ingrediente'
+        verbose_name_plural = 'Ingredientes'
+        ordering = ['name']
+        constraints = [
+            models.CheckConstraint(check=models.Q(stock_quantity__gte=0), name='ingredient_stock_non_negative'),
+            models.CheckConstraint(check=models.Q(cost_price__gte=0), name='ingredient_cost_non_negative'),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class ProductIngredient(models.Model):
+    """Receita de ingredientes por produto"""
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='recipe_items', verbose_name='Produto')
+    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, related_name='recipe_products', verbose_name='Ingrediente')
+    quantity = models.DecimalField(max_digits=10, decimal_places=3, verbose_name='Quantidade na receita')
+
+    class Meta:
+        verbose_name = 'Ingrediente da Receita'
+        verbose_name_plural = 'Ingredientes da Receita'
+        unique_together = ('product', 'ingredient')
+        constraints = [
+            models.CheckConstraint(check=models.Q(quantity__gt=0), name='recipe_quantity_positive'),
+        ]
+
+    def __str__(self):
+        return f"{self.product.name} - {self.ingredient.name} ({self.quantity} {self.ingredient.unit})"
 
 
 class Order(models.Model):
@@ -132,6 +253,12 @@ class OrderItem(models.Model):
     class Meta:
         verbose_name = 'Item do Pedido'
         verbose_name_plural = 'Itens do Pedido'
+        constraints = [
+            models.CheckConstraint(check=models.Q(quantity__gt=0), name='orderitem_quantity_positive'),
+            models.CheckConstraint(check=models.Q(pending_quantity__gte=0), name='orderitem_pending_non_negative'),
+            models.CheckConstraint(check=models.Q(pending_quantity__lte=models.F('quantity')), name='orderitem_pending_lte_quantity'),
+            models.CheckConstraint(check=models.Q(unit_price__gte=0), name='orderitem_unit_price_non_negative'),
+        ]
 
     def __str__(self):
         return f"{self.quantity}x {self.product.name}"
