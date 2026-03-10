@@ -1,4 +1,5 @@
 {% extends 'restaurante/admin/base_admin.html' %}
+{% load l10n %}
 
 {% block title %}{% if product %}Editar{% else %}Novo{% endif %} Produto - {{ app_settings.store_name }}{% endblock %}
 
@@ -13,7 +14,7 @@
     </div>
     
     <!-- Formulário -->
-    <form method="post" enctype="multipart/form-data" class="bg-white rounded-3xl p-8 border border-slate-200">
+    <form method="post" enctype="multipart/form-data" autocomplete="off" class="bg-white rounded-3xl p-8 border border-slate-200">
         {% csrf_token %}
         
         <div class="space-y-6">
@@ -49,7 +50,7 @@
                     <input 
                         type="number" 
                         name="price"
-                        value="{{ product.price|default:'' }}"
+                        value="{{ product.price|unlocalize|default:'' }}"
                         step="0.01"
                         min="0"
                         class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 outline-none transition-all font-medium"
@@ -64,7 +65,7 @@
                         id="manualStockInput"
                         type="number"
                         name="stock"
-                        value="{% if form.data.stock %}{{ form.data.stock }}{% else %}{{ product.stock|default:'0' }}{% endif %}"
+                        value="{% if form.data.stock %}{{ form.data.stock }}{% else %}{{ product.stock|unlocalize|default:'0' }}{% endif %}"
                         min="0"
                         class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-red-500/50 focus:border-red-500 outline-none transition-all font-medium"
                         placeholder="0"
@@ -105,7 +106,7 @@
                             </select>
                         </div>
                         <div class="col-span-4">
-                            <input type="number" name="recipe_quantity[]" value="{{ item.quantity }}" step="0.001" min="0.001" class="recipe-quantity-input w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium" placeholder="Qtd" required />
+                            <input type="number" name="recipe_quantity[]" value="{{ item.quantity|unlocalize }}" step="0.001" min="0.001" class="recipe-quantity-input w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium" placeholder="Qtd" required />
                         </div>
                         <div class="col-span-1">
                             <button type="button" class="remove-recipe-row w-full h-full rounded-xl bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-600 transition-all">
