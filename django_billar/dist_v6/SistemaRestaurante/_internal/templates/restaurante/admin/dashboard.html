@@ -1,0 +1,333 @@
+{% extends 'restaurante/admin/base_admin.html' %}
+
+{% block title %}Dashboard - {{ app_settings.store_name }}{% endblock %}
+
+{% block admin_content %}
+<div class="max-w-[1400px] mx-auto">
+    <!-- Título -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-black text-slate-800">Dashboard</h1>
+        <p class="text-slate-500">Visão geral do seu restaurante</p>
+    </div>
+    
+    <!-- Connection Status Indicator -->
+    <div id="connectionStatus" class="mb-4 p-3 bg-slate-100 rounded-2xl text-sm font-bold text-slate-600 flex items-center gap-2 hidden">
+        <span id="connectionStatusIcon" class="text-lg">🔄</span>
+        <span id="connectionStatusText">Conectando ao servidor...</span>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Vendas Hoje -->
+        <div class="bg-gradient-to-br from-red-500 to-orange-600 rounded-3xl p-6 text-white">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-currency-dollar text-2xl"></i>
+                </div>
+                <span class="text-xs font-bold uppercase tracking-wider opacity-70">Hoje</span>
+            </div>
+            <p id="statVendasHoje" class="text-3xl font-black">R$ {{ vendas_hoje|floatformat:2 }}</p>
+            <p class="text-sm opacity-70 mt-1">Vendas do dia</p>
+        </div>
+        
+        <!-- Pedidos Hoje -->
+        <div class="bg-gradient-to-br from-amber-400 to-orange-500 rounded-3xl p-6 text-slate-900">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-black/10 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-receipt text-2xl"></i>
+                </div>
+                <span class="text-xs font-bold uppercase tracking-wider opacity-70">Hoje</span>
+            </div>
+            <p id="statPedidosHoje" class="text-3xl font-black">{{ pedidos_hoje }}</p>
+            <p class="text-sm opacity-70 mt-1">Pedidos finalizados</p>
+        </div>
+        
+        <!-- Pedidos Ativos -->
+        <div class="bg-gradient-to-br from-emerald-500 to-green-600 rounded-3xl p-6 text-white">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-clock-history text-2xl"></i>
+                </div>
+                <span class="text-xs font-bold uppercase tracking-wider opacity-70">Ativos</span>
+            </div>
+            <p id="statPedidosAtivos" class="text-3xl font-black">{{ pedidos_ativos }}</p>
+            <p class="text-sm opacity-70 mt-1">Em andamento</p>
+        </div>
+        
+        <!-- Mesas Ativas -->
+        <div class="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-3xl p-6 text-white">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-grid-3x3 text-2xl"></i>
+                </div>
+                <span class="text-xs font-bold uppercase tracking-wider opacity-70">Mesas</span>
+            </div>
+            <p id="statMesasAtivas" class="text-3xl font-black">{{ mesas_ativas }}</p>
+            <p class="text-sm opacity-70 mt-1">Mesas ocupadas</p>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Pedidos Ativos -->
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-black text-slate-800">Pedidos Ativos</h2>
+                <span id="activeOrdersCount" class="px-3 py-1 bg-slate-100 rounded-full text-slate-600 text-sm font-bold">{{ active_orders|length }}</span>
+            </div>
+            
+            <div id="activeOrdersContainer" class="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar">
+                {% for order in active_orders %}
+                <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border-l-4 {% if order.status == 'cozinha' %}border-amber-500{% else %}border-cyan-500{% endif %}">
+                    <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center font-black text-lg text-slate-700 shadow-sm">
+                        {% if order.order_type == 'delivery' or order.mesa == 'DELIVERY' %}
+                        <span class="text-[10px] font-black uppercase tracking-wide text-indigo-600 flex items-center gap-1">
+                            <i class="bi bi-truck text-xs"></i>DLV
+                        </span>
+                        {% else %}
+                        {{ order.mesa }}
+                        {% endif %}
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-bold text-slate-800">{{ order.cliente }}</p>
+                        {% if order.platform_name %}
+                        <span class="inline-flex items-center gap-1 mt-1 px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-wide">
+                            <i class="bi bi-phone text-[10px]"></i>{{ order.platform_name }}
+                        </span>
+                        {% endif %}
+                        <p class="text-sm text-slate-400">{{ order.items.count }} itens • R$ {{ order.total }}</p>
+                        <div class="flex gap-2 mt-2">
+                            <a href="{% url 'manage_order' order.id %}" class="px-3 py-1 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-700 transition-all">
+                                <i class="bi bi-pencil-square me-1"></i>Alterar
+                            </a>
+                            <a href="{% url 'close_order' order.id %}" class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-200 transition-all">
+                                <i class="bi bi-cash-stack me-1"></i>Fechar
+                            </a>
+                            <form method="post" action="{% url 'cancel_order' order.id %}" class="inline" data-confirm-message="Cancelar este pedido?">
+                                {% csrf_token %}
+                                <button type="submit" class="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition-all">
+                                    <i class="bi bi-x-circle me-1"></i>Cancelar
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-xs font-bold {% if order.status == 'cozinha' %}bg-amber-100 text-amber-700{% else %}bg-cyan-100 text-cyan-700{% endif %}">
+                        {{ order.get_status_display }}
+                    </span>
+                </div>
+                {% empty %}
+                <div class="text-center py-12">
+                    <i class="bi bi-inbox text-4xl text-slate-300"></i>
+                    <p class="text-slate-400 mt-2">Nenhum pedido ativo</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Alertas de Estoque -->
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-black text-slate-800">Alertas de Ingredientes</h2>
+                <span id="lowStockCount" class="px-3 py-1 bg-red-100 rounded-full text-red-600 text-sm font-bold">{{ low_stock_ingredients|length }}</span>
+            </div>
+            
+            <div id="lowStockContainer" class="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar">
+                {% for ingredient in low_stock_ingredients %}
+                <div class="flex items-center gap-4 p-4 bg-red-50 rounded-2xl">
+                    <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-2xl shadow-sm">
+                        <i class="bi bi-box-seam text-red-500"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-bold text-slate-800">{{ ingredient.name }}</p>
+                        <p class="text-sm text-red-500">Apenas {{ ingredient.stock_quantity }} {{ ingredient.unit }}</p>
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-600">
+                        <i class="bi bi-exclamation-triangle me-1"></i>Baixo
+                    </span>
+                </div>
+                {% empty %}
+                <div class="text-center py-12">
+                    <i class="bi bi-check-circle text-4xl text-emerald-400"></i>
+                    <p class="text-slate-400 mt-2">Estoque em dia!</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+let adminDashboardSocket = null;
+let adminReconnectTimeout = null;
+let adminReconnectAttempts = 0;
+const adminMaxReconnectAttempts = 5;
+
+function updateConnectionStatus(status, message, icon) {
+    const statusEl = document.getElementById('connectionStatus');
+    const statusIcon = document.getElementById('connectionStatusIcon');
+    const statusText = document.getElementById('connectionStatusText');
+    
+    if (statusEl && statusIcon && statusText) {
+        statusEl.className = `mb-4 p-3 rounded-2xl text-sm font-bold flex items-center gap-2 ${status === 'connected' ? 'bg-emerald-100 text-emerald-700' : status === 'error' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`;
+        statusIcon.textContent = icon || '🔄';
+        statusText.textContent = message;
+        statusEl.classList.remove('hidden');
+        
+        if (status === 'connected') {
+            setTimeout(() => statusEl.classList.add('hidden'), 3000);
+        }
+    }
+}
+
+async function fetchDashboardData() {
+    try {
+        const response = await fetch(window.location.href, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch');
+        
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Update stats
+        const statElements = {
+            'statVendasHoje': doc.querySelector('#statVendasHoje'),
+            'statPedidosHoje': doc.querySelector('#statPedidosHoje'),
+            'statPedidosAtivos': doc.querySelector('#statPedidosAtivos'),
+            'statMesasAtivas': doc.querySelector('#statMesasAtivas')
+        };
+        
+        for (const [id, sourceEl] of Object.entries(statElements)) {
+            const targetEl = document.getElementById(id);
+            if (targetEl && sourceEl) {
+                const oldValue = targetEl.textContent;
+                const newValue = sourceEl.textContent;
+                if (oldValue !== newValue) {
+                    targetEl.classList.add('animate-pulse');
+                    targetEl.textContent = newValue;
+                    setTimeout(() => targetEl.classList.remove('animate-pulse'), 500);
+                }
+            }
+        }
+        
+        // Update active orders
+        const activeOrdersContainer = doc.querySelector('#activeOrdersContainer');
+        if (activeOrdersContainer) {
+            document.getElementById('activeOrdersContainer').innerHTML = activeOrdersContainer.innerHTML;
+            
+            const count = doc.querySelector('#activeOrdersCount')?.textContent || '0';
+            document.getElementById('activeOrdersCount').textContent = count;
+        }
+        
+        // Update low stock alerts
+        const lowStockContainer = doc.querySelector('#lowStockContainer');
+        if (lowStockContainer) {
+            document.getElementById('lowStockContainer').innerHTML = lowStockContainer.innerHTML;
+            
+            const count = doc.querySelector('#lowStockCount')?.textContent || '0';
+            document.getElementById('lowStockCount').textContent = count;
+        }
+        
+    } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+    }
+}
+
+function connectAdminDashboardSocket() {
+    if (adminDashboardSocket && adminDashboardSocket.readyState === WebSocket.OPEN) {
+        return;
+    }
+    
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/orders/`;
+    
+    updateConnectionStatus('connecting', 'Conectando ao servidor...', '🔄');
+    
+    try {
+        adminDashboardSocket = new WebSocket(wsUrl);
+        
+        adminDashboardSocket.onopen = function() {
+            console.log('Dashboard WebSocket connected');
+            adminReconnectAttempts = 0;
+            updateConnectionStatus('connected', 'Conectado! Atualizações em tempo real ativas.', '✅');
+        };
+        
+        adminDashboardSocket.onmessage = function(e) {
+            try {
+                const data = JSON.parse(e.data);
+                console.log('Dashboard received:', data);
+                
+                if (data.type === 'connection.ready') {
+                    console.log('Dashboard connection ready');
+                    return;
+                }
+                
+                // Show notifications for order events
+                if (data.event_type === 'order.created') {
+                    showToast(`Novo pedido criado: ${data.order?.mesa || 'DELIVERY'}`, 'success');
+                    fetchDashboardData();
+                } else if (data.event_type === 'order.updated') {
+                    showToast(`Pedido ${data.order?.mesa || 'DELIVERY'} atualizado`, 'info');
+                    fetchDashboardData();
+                } else if (data.event_type === 'order.deleted') {
+                    showToast(`Pedido cancelado`, 'warning');
+                    fetchDashboardData();
+                } else if (data.event_type === 'order.status_changed') {
+                    showToast(`Status do pedido ${data.order?.mesa || ''} alterado`, 'info');
+                    fetchDashboardData();
+                }
+                
+            } catch (error) {
+                console.error('Error processing dashboard message:', error);
+            }
+        };
+        
+        adminDashboardSocket.onerror = function(error) {
+            console.error('Dashboard WebSocket error:', error);
+            // Silencioso - polling será ativado no onclose
+        };
+        
+        adminDashboardSocket.onclose = function(e) {
+            console.log('Dashboard WebSocket closed:', e.code, e.reason);
+            adminDashboardSocket = null;
+            
+            if (adminReconnectAttempts < 3) {
+                // Tenta reconectar via WebSocket
+                adminReconnectAttempts++;
+                const delay = Math.min(1000 * Math.pow(2, adminReconnectAttempts), 10000);
+                adminReconnectTimeout = setTimeout(connectAdminDashboardSocket, delay);
+            } else {
+                // Fallback para polling HTTP
+                console.log('WebSocket indisponível, usando polling HTTP');
+                setInterval(fetchDashboardData, 3000);
+            }
+        };
+        
+    } catch (error) {
+        console.error('Error creating dashboard WebSocket:', error);
+        // Fallback para polling HTTP
+        setInterval(fetchDashboardData, 3000);
+    }
+}
+
+// Connect on page load
+document.addEventListener('DOMContentLoaded', function() {
+    connectAdminDashboardSocket();
+});
+
+// Clean up on page unload
+window.addEventListener('beforeunload', function() {
+    if (adminDashboardSocket) {
+        adminDashboardSocket.close();
+    }
+    if (adminReconnectTimeout) {
+        clearTimeout(adminReconnectTimeout);
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}
