@@ -8,9 +8,15 @@
         <h2 class="text-lg md:text-xl font-black text-slate-800">Pedido #{{ order.id }}</h2>
         <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Mesa {{ order.mesa }} • {{ order.get_status_display }}</p>
     </div>
-    <a href="{% url 'waiter' %}" class="p-3 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all font-semibold text-sm touch-manipulation">
+    {% if request.user.role == 'garcom' %}
+    <a href="{% url 'waiter_view' %}" class="p-3 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all font-semibold text-sm touch-manipulation">
         <i class="bi bi-arrow-left"></i>
     </a>
+    {% else %}
+    <a href="{% url 'admin_dashboard' %}" class="p-3 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all font-semibold text-sm touch-manipulation">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+    {% endif %}
 </header>
 {% endblock %}
 
@@ -29,6 +35,7 @@
                             <div class="min-w-0 flex-1">
                                 <p class="font-bold text-slate-800 truncate">{{ item.product.name }}</p>
                                 <p class="text-xs text-slate-400">R$ {{ item.unit_price|floatformat:2 }} cada</p>
+                                <p class="text-xs text-amber-600 font-semibold">Pendente para cozinha: {{ item.pending_quantity }}</p>
                             </div>
                             <button type="button" data-item-id="{{ item.id }}" data-item-action="delete" 
                                     class="w-12 h-12 flex items-center justify-center rounded-xl bg-red-100 text-red-600 hover:bg-red-200 transition-all touch-manipulation active:scale-95">
@@ -37,7 +44,7 @@
                         </div>
                         <div class="flex items-center justify-between mt-4 pt-3 border-t border-slate-200">
                             <div class="flex items-center gap-3">
-                                <button type="button" data-item-id="{{ item.id }}" data-item-action="remove" 
+                                <button type="button" data-item-id="{{ item.id }}" data-item-action="remove" title="Cancelar 1 unidade pendente"
                                         class="w-12 h-12 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all touch-manipulation active:scale-95">
                                     <i class="bi bi-dash-lg text-xl"></i>
                                 </button>
@@ -96,12 +103,15 @@
                     {% for category in categories %}
                         {% for product in category.products.all %}
                         {% if product.available_stock > 0 %}
-                            <button type="button" data-add-product-id="{{ product.id }}" 
-                                    class="p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:shadow-md transition-all text-center touch-manipulation active:scale-95">
+                            <div class="p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:shadow-md transition-all text-center touch-manipulation" data-product-name="{{ product.name|escapejs }}">
                                 <div class="text-2xl md:text-3xl mb-1 md:mb-2">{{ product.icon|default:'🍔' }}</div>
                                 <p class="font-bold text-slate-800 text-xs md:text-sm truncate">{{ product.name }}</p>
                                 <p class="text-[10px] md:text-xs text-slate-400">R$ {{ product.price }}</p>
-                            </button>
+                                <button type="button" data-add-product-id="{{ product.id }}" data-add-product-name="{{ product.name|escapejs }}"
+                                        class="mt-2 w-full px-2 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] md:text-xs font-bold uppercase tracking-wide hover:bg-emerald-100 transition-all active:scale-95">
+                                    Add Pedido
+                                </button>
+                            </div>
                         {% endif %}
                         {% endfor %}
                     {% endfor %}
@@ -167,14 +177,14 @@ function renderManageOrderItems(order) {
                         <p class="font-bold text-slate-800 truncate">${item.product_name}</p>
                         <p class="text-xs text-slate-400">R$ ${Number(item.unit_price).toFixed(2)} cada</p>
                     </div>
-                    <button type="button" data-item-id="${item.id}" data-item-action="delete" 
+                    <button type="button" data-item-id="${item.id}" data-item-action="delete" title="Cancelar todas as unidades pendentes"
                             class="w-12 h-12 flex items-center justify-center rounded-xl bg-red-100 text-red-600 hover:bg-red-200 transition-all touch-manipulation active:scale-95">
                         <i class="bi bi-trash text-lg"></i>
                     </button>
                 </div>
                 <div class="flex items-center justify-between mt-4 pt-3 border-t border-slate-200">
                     <div class="flex items-center gap-3">
-                        <button type="button" data-item-id="${item.id}" data-item-action="remove" 
+                        <button type="button" data-item-id="${item.id}" data-item-action="remove" title="Cancelar 1 unidade pendente"
                                 class="w-12 h-12 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all touch-manipulation active:scale-95">
                             <i class="bi bi-dash-lg text-xl"></i>
                         </button>
@@ -186,6 +196,7 @@ function renderManageOrderItems(order) {
                     </div>
                     <span class="font-bold text-slate-800 text-lg">R$ ${Number(item.subtotal).toFixed(2)}</span>
                 </div>
+                <p class="text-xs text-amber-600 font-semibold mt-2">Pendente para cozinha: ${item.pending_quantity}</p>
             </div>
         `;
     }).join('');
@@ -240,10 +251,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (addProductBtn) {
             event.preventDefault();
             const productId = addProductBtn.dataset.addProductId;
+            const productName = addProductBtn.dataset.addProductName || addProductBtn.closest('[data-product-name]')?.dataset?.productName || 'Item';
             const formData = new FormData();
             try {
                 const data = await managePost(manageOrderEndpoint(manageOrderApi.addProduct, productId), formData);
                 showManageFeedback(data.message, false);
+                showToast(`${productName} adicionado ao pedido`, 'success', 1400);
                 renderManageOrderItems(data.order);
             } catch (error) {
                 showManageFeedback(error.message, true);
@@ -256,6 +269,12 @@ document.addEventListener('DOMContentLoaded', function() {
             event.preventDefault();
             const itemId = itemActionBtn.dataset.itemId;
             const action = itemActionBtn.dataset.itemAction;
+            if (action === 'delete') {
+                const confirmed = await showConfirmModal('Cancelar todas as unidades pendentes deste item?', 'Cancelar Item');
+                if (!confirmed) {
+                    return;
+                }
+            }
             const formData = new FormData();
             formData.append('action', action);
             try {

@@ -33,7 +33,14 @@
                             <p class="font-bold text-slate-800">{{ ingredient.name }}</p>
                             <p class="text-xs text-slate-400">Unidade: {{ ingredient.get_unit_display }}</p>
                         </td>
-                        <td class="py-4 px-5 font-semibold text-slate-700">{{ ingredient.stock_quantity }} {{ ingredient.unit }}</td>
+                        <td class="py-4 px-5">
+                            <span class="font-semibold text-slate-700">{{ ingredient.stock_quantity }} {{ ingredient.unit }}</span>
+                            {% if ingredient.low_stock_alert and ingredient.stock_quantity <= ingredient.low_stock_alert %}
+                            <span class="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i>Estoque baixo
+                            </span>
+                            {% endif %}
+                        </td>
                         <td class="py-4 px-5 font-semibold text-slate-700">R$ {{ ingredient.cost_price }}</td>
                         <td class="py-4 px-5">
                             {% if ingredient.is_active %}
@@ -46,9 +53,9 @@
                             <a href="{% url 'ingredient_edit' ingredient.id %}" class="inline-flex items-center px-3 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all me-2">
                                 <i class="bi bi-pencil me-1"></i>Editar
                             </a>
-                            <form method="post" action="{% url 'ingredient_delete' ingredient.id %}" class="inline">
+                            <form method="post" action="{% url 'ingredient_delete' ingredient.id %}" class="inline" data-confirm-message="Remover este ingrediente?">
                                 {% csrf_token %}
-                                <button type="submit" class="inline-flex items-center px-3 py-2 bg-slate-100 text-slate-400 rounded-lg text-sm hover:bg-red-100 hover:text-red-600 transition-all" onclick="return confirm('Remover este ingrediente?');">
+                                <button type="submit" class="inline-flex items-center px-3 py-2 bg-slate-100 text-slate-400 rounded-lg text-sm hover:bg-red-100 hover:text-red-600 transition-all">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>

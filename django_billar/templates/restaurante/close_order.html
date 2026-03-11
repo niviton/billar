@@ -66,7 +66,7 @@
                 <span class="text-3xl font-black text-emerald-700">R$ {{ order.total|floatformat:2 }}</span>
             </div>
 
-            <form method="post" class="space-y-4">
+            <form method="post" class="space-y-4" data-confirm-message="Confirmar pagamento e fechar este pedido?">
                 {% csrf_token %}
 
                 <h2 class="font-bold text-slate-700">Forma de Pagamento</h2>

@@ -63,11 +63,12 @@ class IngredientForm(forms.ModelForm):
     """Formulário de ingrediente"""
     class Meta:
         model = Ingredient
-        fields = ['name', 'unit', 'stock_quantity', 'cost_price', 'is_active']
+        fields = ['name', 'unit', 'stock_quantity', 'low_stock_alert', 'cost_price', 'is_active']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'unit': forms.Select(attrs={'class': 'form-control'}),
             'stock_quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001', 'min': '0'}),
+            'low_stock_alert': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001', 'min': '0'}),
             'cost_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
@@ -140,6 +141,7 @@ class AppSettingsForm(forms.ModelForm):
             'text_color',
             'pix_key',
             'pix_name',
+            'pix_qrcode',
             'show_pix_on_receipt',
         ]
         widgets = {

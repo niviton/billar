@@ -97,7 +97,15 @@ Antes de subir em produção, configure:
 - `DJANGO_SECRET_KEY`
 - `DJANGO_DEBUG` (`false` em produção)
 - `DJANGO_ALLOWED_HOSTS` (ex: `meudominio.com,www.meudominio.com`)
+- `DJANGO_CSRF_TRUSTED_ORIGINS` (ex: `https://meudominio.com,https://www.meudominio.com`)
+- `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`
 - `BILLAR_INIT_ADMIN_PASSWORD` (senha inicial do usuário gerente no `initial_data.py`)
+
+Para banco PostgreSQL mais seguro em produção:
+
+- `DB_ENGINE=postgres`
+- `POSTGRES_SSLMODE=require` (ou `verify-full` com certificados)
+- `POSTGRES_SSLROOTCERT`, `POSTGRES_SSLCERT`, `POSTGRES_SSLKEY` (quando usar TLS mTLS)
 
 ## 👤 Usuários Padrão
 

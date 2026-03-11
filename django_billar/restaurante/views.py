@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
-from django.db.models import Sum, Count, Avg
+from django.db.models import Sum, Count, Avg, F
 from django.db.models.functions import TruncDay, TruncWeek, TruncMonth
 from django.db import transaction
 from django.core.exceptions import PermissionDenied
@@ -16,6 +16,7 @@ from django.utils import timezone
 from datetime import timedelta, date
 from decimal import Decimal, InvalidOperation
 import json
+import socket
 
 from .models import User, Category, Product, Order, OrderItem, AppSettings, Ingredient, ProductIngredient
 from .forms import (
@@ -175,9 +176,6 @@ def waiter_view(request):
         return redirect('kitchen_view')
 
     categories = Category.objects.prefetch_related('products__recipe_items__ingredient').all()
-    active_orders = Order.objects.filter(
-        status__in=['cozinha', 'pronto']
-    ).order_by('-created_at')
     
     # Carrinho da sessão
     cart = request.session.get('cart', [])
@@ -185,7 +183,6 @@ def waiter_view(request):
     
     context = {
         'categories': categories,
-        'active_orders': active_orders,
         'cart': cart,
         'cart_total': cart_total,
     }
@@ -267,7 +264,7 @@ def submit_order(request):
             messages.error(request, '❌ O carrinho está vazio')
             return redirect_order_entry(request)
         
-        mesa = request.POST.get('mesa', '').strip()
+        mesa = request.POST.get('mesa', '').strip().upper()
         cliente = request.POST.get('cliente', '').strip() or 'Cliente'
         observacoes = request.POST.get('observacoes', '').strip()
         order_type = request.POST.get('order_type', 'dine-in')
@@ -294,9 +291,9 @@ def submit_order(request):
             active_order = None
             if order_type == 'dine-in':
                 active_order = Order.objects.filter(
-                    mesa=mesa, 
+                    mesa=mesa,
                     status__in=['cozinha', 'pronto']
-                ).first()
+                ).order_by('-updated_at', '-id').first()
 
             stock_error = validate_cart_ingredient_stock(cart)
             if stock_error:
@@ -340,7 +337,7 @@ def submit_order(request):
                         active_order.observacoes = (active_order.observacoes + " | " + observacoes) if active_order.observacoes else observacoes
                     active_order.calculate_total()
                     sync_order_kitchen_status(active_order)
-                    messages.success(request, f'✅ Pedido atualizado para mesa {mesa}')
+                    messages.success(request, f'✅ Itens adicionados ao pedido da mesa {mesa}.')
                 else:
                 # Criar novo pedido
                     total = sum(item['price'] * item['qty'] for item in cart)
@@ -439,6 +436,12 @@ def order_snapshot(order):
 def sync_order_kitchen_status(order):
     """Mantém status baseado no que ainda falta preparar na cozinha."""
     if order.status in ['finalizado', 'cancelado']:
+        return
+
+    # Se o pedido ficou sem nenhum item, cancela automaticamente
+    if not order.items.exists():
+        order.status = 'cancelado'
+        order.save(update_fields=['status', 'updated_at'])
         return
 
     has_pending_items = order.items.filter(pending_quantity__gt=0).exists()
@@ -599,9 +602,14 @@ def change_order_item_qty(request, order_id, item_id):
         order_item.save(update_fields=['quantity', 'pending_quantity'])
 
     elif action == 'remove':
+        if order_item.pending_quantity <= 0:
+            if is_ajax_request(request):
+                return JsonResponse({'success': False, 'message': 'Este item já está em preparo ou pronto e não pode ser cancelado.'}, status=400)
+            messages.error(request, 'Este item já está em preparo ou pronto e não pode ser cancelado.')
+            return redirect('manage_order', order_id=order.id)
+
         order_item.quantity -= 1
-        if order_item.pending_quantity > 0:
-            order_item.pending_quantity -= 1
+        order_item.pending_quantity -= 1
         product.restore_ingredients(1)
         if order_item.quantity <= 0:
             order_item.delete()
@@ -609,8 +617,20 @@ def change_order_item_qty(request, order_id, item_id):
             order_item.save(update_fields=['quantity', 'pending_quantity'])
 
     elif action == 'delete':
-        product.restore_ingredients(order_item.quantity)
-        order_item.delete()
+        if order_item.pending_quantity <= 0:
+            if is_ajax_request(request):
+                return JsonResponse({'success': False, 'message': 'Não há quantidade pendente para cancelar neste item.'}, status=400)
+            messages.error(request, 'Não há quantidade pendente para cancelar neste item.')
+            return redirect('manage_order', order_id=order.id)
+
+        pending_to_cancel = order_item.pending_quantity
+        product.restore_ingredients(pending_to_cancel)
+        order_item.quantity -= pending_to_cancel
+        order_item.pending_quantity = 0
+        if order_item.quantity <= 0:
+            order_item.delete()
+        else:
+            order_item.save(update_fields=['quantity', 'pending_quantity'])
 
     else:
         if is_ajax_request(request):
@@ -725,9 +745,10 @@ def admin_dashboard(request):
         order_type='dine-in'
     ).values('mesa').distinct().count()
     
-    # Alertas de estoque baixo (ingredientes com menos de 10 unidades)
+    # Alertas de estoque baixo (ingredientes abaixo do limite configurado)
     low_stock_ingredients = Ingredient.objects.filter(
-        stock_quantity__lt=10,
+        low_stock_alert__gt=0,
+        stock_quantity__lte=F('low_stock_alert'),
         is_active=True
     ).order_by('stock_quantity')[:5]
     
@@ -952,9 +973,13 @@ def product_delete(request, product_id):
     if request.user.role != 'gerente':
         return redirect('dashboard')
     
-    product = get_object_or_404(Product, id=product_id)
-    product.delete()
-    messages.success(request, 'Produto removido!')
+    try:
+        product = Product.objects.get(id=product_id)
+        product.delete()
+        messages.success(request, 'Produto removido!')
+    except Product.DoesNotExist:
+        messages.warning(request, 'Produto não encontrado ou já foi removido.')
+    
     return redirect('admin_menu')
 
 
@@ -1009,9 +1034,13 @@ def category_delete(request, category_id):
     if request.user.role != 'gerente':
         return redirect('dashboard')
 
-    category = get_object_or_404(Category, id=category_id)
-    category.delete()
-    messages.success(request, 'Categoria removida!')
+    try:
+        category = Category.objects.get(id=category_id)
+        category.delete()
+        messages.success(request, 'Categoria removida!')
+    except Category.DoesNotExist:
+        messages.warning(request, 'Categoria não encontrada ou já foi removida.')
+    
     return redirect('admin_menu')
 
 
@@ -1082,9 +1111,13 @@ def ingredient_delete(request, ingredient_id):
     if request.user.role != 'gerente':
         return redirect('dashboard')
 
-    ingredient = get_object_or_404(Ingredient, id=ingredient_id)
-    ingredient.delete()
-    messages.success(request, 'Ingrediente removido!')
+    try:
+        ingredient = Ingredient.objects.get(id=ingredient_id)
+        ingredient.delete()
+        messages.success(request, 'Ingrediente removido!')
+    except Ingredient.DoesNotExist:
+        messages.warning(request, 'Ingrediente não encontrado ou já foi removido.')
+    
     return redirect('admin_ingredients')
 
 
@@ -1169,9 +1202,13 @@ def user_delete(request, user_id):
         messages.error(request, 'Você não pode excluir a si mesmo')
         return redirect('admin_users')
     
-    user = get_object_or_404(User, id=user_id)
-    user.delete()
-    messages.success(request, 'Usuário removido!')
+    try:
+        user = User.objects.get(id=user_id)
+        user.delete()
+        messages.success(request, 'Usuário removido!')
+    except User.DoesNotExist:
+        messages.warning(request, 'Usuário não encontrado ou já foi removido.')
+    
     return redirect('admin_users')
 
 
@@ -1193,7 +1230,30 @@ def admin_settings(request):
     else:
         form = AppSettingsForm(instance=settings)
     
-    return render(request, 'restaurante/admin/settings.html', {'form': form, 'settings': settings, 'active_menu': 'settings'})
+    def get_local_ip_address():
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.connect(('8.8.8.8', 80))
+            ip = sock.getsockname()[0]
+            sock.close()
+            return ip
+        except Exception:
+            return '127.0.0.1'
+
+    local_ip = get_local_ip_address()
+    local_port = request.get_port() or '8000'
+    access_links = {
+        'local': f'http://localhost:{local_port}',
+        'network': f'http://{local_ip}:{local_port}',
+    }
+
+    return render(request, 'restaurante/admin/settings.html', {
+        'form': form,
+        'settings': settings,
+        'active_menu': 'settings',
+        'access_links': access_links,
+        'local_ip': local_ip,
+    })
 
 
 @login_required

@@ -28,6 +28,22 @@ New-NetFirewallRule -DisplayName "Billa Burger" -Direction Inbound -LocalPort 80
 
 ## 📋 Opção 2: Rodar do Código Fonte (Git Clone)
 
+### ✅ Início Automático (PC Novo)
+
+Após clonar, basta executar:
+
+```powershell
+INICIAR_PC_NOVO.bat
+```
+
+Esse arquivo configura automaticamente no PC novo:
+- cria o ambiente virtual (`venv`)
+- instala dependências
+- aplica migrações do banco
+- inicia o sistema na rede local
+
+Depois, na tela **Configurações**, o sistema mostra os links prontos de acesso para PC e celular.
+
 ### Requisitos:
 - Python 3.11 ou superior: https://www.python.org/downloads/
 - Git (opcional): https://git-scm.com/downloads

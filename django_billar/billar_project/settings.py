@@ -7,6 +7,13 @@ from pathlib import Path
 import os
 import socket
 import sys
+from django.core.exceptions import ImproperlyConfigured
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -15,14 +22,30 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if getattr(sys, 'frozen', False):
     BASE_DIR = Path(sys.executable).resolve().parent / '_internal'
 
+
+def env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ('1', 'true', 'yes', 'on')
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-billar-burger-change-this-in-production')
+DEFAULT_SECRET_KEY = 'django-insecure-billar-burger-change-this-in-production'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', DEFAULT_SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DJANGO_DEBUG', 'true').strip().lower() == 'true'
+DEBUG = env_bool('DJANGO_DEBUG', True)
+
+if not DEBUG and SECRET_KEY == DEFAULT_SECRET_KEY:
+    raise ImproperlyConfigured('Defina DJANGO_SECRET_KEY com um valor forte em produção.')
 
 raw_allowed_hosts = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').strip()
 ALLOWED_HOSTS = [host.strip() for host in raw_allowed_hosts.split(',') if host.strip()]
+
+
+def split_csv_env(name):
+    raw = os.getenv(name, '').strip()
+    return [item.strip() for item in raw.split(',') if item.strip()]
 
 # Detecta IP local automaticamente para acesso em rede local
 def get_local_ip():
@@ -39,8 +62,12 @@ local_ip = get_local_ip()
 if local_ip and local_ip not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(local_ip)
 
+machine_name = socket.gethostname().strip().lower()
+if machine_name and machine_name not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(machine_name)
+
 # Aceita qualquer IP local em modo executável (para facilitar acesso em rede)
-if getattr(sys, 'frozen', False):
+if getattr(sys, 'frozen', False) and env_bool('ALLOW_ANY_HOST_FROZEN', False):
     ALLOWED_HOSTS.append('*')
 
 ENABLE_REALTIME = os.getenv('ENABLE_REALTIME', 'true').strip().lower() == 'true'
@@ -60,10 +87,30 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.githubpreview.dev',
 ]
 
+CSRF_TRUSTED_ORIGINS.extend(split_csv_env('DJANGO_CSRF_TRUSTED_ORIGINS'))
+
+if local_ip and DEBUG:
+    CSRF_TRUSTED_ORIGINS.extend([
+        f'http://{local_ip}',
+        f'https://{local_ip}',
+        f'http://{local_ip}:8000',
+        f'https://{local_ip}:8000',
+    ])
+
+if machine_name and DEBUG:
+    CSRF_TRUSTED_ORIGINS.extend([
+        f'http://{machine_name}',
+        f'https://{machine_name}',
+        f'http://{machine_name}:8000',
+        f'https://{machine_name}:8000',
+    ])
+
 codespace_name = os.getenv('CODESPACE_NAME', '').strip()
 forward_domain = os.getenv('GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN', '').strip()
-if codespace_name and forward_domain:
+if DEBUG and codespace_name and forward_domain:
     CSRF_TRUSTED_ORIGINS.append(f'https://{codespace_name}-*.{forward_domain}')
+
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
 
 # Em desenvolvimento, manter token CSRF por cookie é mais compatível com os
 # fluxos AJAX já existentes no projeto.
@@ -79,16 +126,16 @@ if os.getenv('CODESPACES', '').lower() == 'true':
     SESSION_COOKIE_SECURE = False
 
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 31536000
+    SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', True)
+    SESSION_COOKIE_SECURE = env_bool('SESSION_COOKIE_SECURE', True)
+    CSRF_COOKIE_SECURE = env_bool('CSRF_COOKIE_SECURE', True)
+    SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '31536000'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
-    SECURE_BROWSER_XSS_FILTER = True
     X_FRAME_OPTIONS = 'DENY'
     SECURE_REFERRER_POLICY = 'same-origin'
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
 
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
@@ -151,6 +198,21 @@ ASGI_APPLICATION = 'billar_project.asgi.application'
 DB_ENGINE = os.getenv('DB_ENGINE', 'sqlite').strip().lower()
 
 if DB_ENGINE == 'postgres':
+    db_sslmode = os.getenv('POSTGRES_SSLMODE', 'prefer').strip()
+    db_options = {}
+    if db_sslmode:
+        db_options['sslmode'] = db_sslmode
+
+    sslrootcert = os.getenv('POSTGRES_SSLROOTCERT', '').strip()
+    sslcert = os.getenv('POSTGRES_SSLCERT', '').strip()
+    sslkey = os.getenv('POSTGRES_SSLKEY', '').strip()
+    if sslrootcert:
+        db_options['sslrootcert'] = sslrootcert
+    if sslcert:
+        db_options['sslcert'] = sslcert
+    if sslkey:
+        db_options['sslkey'] = sslkey
+
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -160,6 +222,9 @@ if DB_ENGINE == 'postgres':
             'HOST': os.getenv('POSTGRES_HOST', '127.0.0.1'),
             'PORT': os.getenv('POSTGRES_PORT', '5432'),
             'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '60')),
+            'CONN_HEALTH_CHECKS': True,
+            'ATOMIC_REQUESTS': True,
+            'OPTIONS': db_options,
         }
     }
 else:
@@ -167,6 +232,10 @@ else:
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+            'ATOMIC_REQUESTS': True,
+            'OPTIONS': {
+                'timeout': int(os.getenv('SQLITE_TIMEOUT', '20')),
+            },
         }
     }
 

@@ -147,6 +147,7 @@ class Ingredient(models.Model):
     name = models.CharField(max_length=120, unique=True, verbose_name='Nome')
     unit = models.CharField(max_length=10, choices=UNIT_CHOICES, default='un', verbose_name='Unidade')
     stock_quantity = models.DecimalField(max_digits=12, decimal_places=3, default=0, verbose_name='Estoque')
+    low_stock_alert = models.DecimalField(max_digits=12, decimal_places=3, default=0, verbose_name='Alerta de estoque baixo')
     cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Custo')
     is_active = models.BooleanField(default=True, verbose_name='Ativo')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -278,6 +279,7 @@ class AppSettings(models.Model):
     store_name = models.CharField(max_length=200, default='Billá Burger', verbose_name='Nome da Loja')
     slogan = models.CharField(max_length=500, default='Os melhores hambúrgueres da cidade!', verbose_name='Slogan')
     logo = models.ImageField(upload_to='settings/', blank=True, null=True, verbose_name='Logo')
+    pix_qrcode = models.ImageField(upload_to='settings/', blank=True, null=True, verbose_name='QR Code PIX')
     
     # Dados da empresa para nota fiscal
     cnpj = models.CharField(max_length=20, blank=True, verbose_name='CNPJ/CPF')

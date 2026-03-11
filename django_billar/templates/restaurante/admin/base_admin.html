@@ -24,7 +24,7 @@
     </div>
 
     <div class="flex items-center gap-6">
-        <form method="post" action="{% url 'toggle_store_status' %}" class="hidden md:block">
+        <form method="post" action="{% url 'toggle_store_status' %}" class="hidden md:block" data-confirm-message="{% if app_settings.is_store_open %}Fechar a loja agora?{% else %}Abrir a loja agora?{% endif %}">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}" />
             <button type="submit" class="px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all {% if app_settings.is_store_open %}bg-emerald-100 text-emerald-700 hover:bg-emerald-200{% else %}bg-red-100 text-red-700 hover:bg-red-200{% endif %}">

@@ -4,3 +4,27 @@ __pycache__/
 
 build/
 dist/
+dist_*/
+*.spec.bak
+
+# Python environments
+.venv/
+venv/
+env/
+
+# Local configuration and secrets
+.env
+
+# Database and backups
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+*.sql
+*.dump
+
+# Logs and OS/editor files
+*.log
+.DS_Store
+Thumbs.db
+
+db.sqlite3
