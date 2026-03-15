@@ -21,6 +21,11 @@ else:
 WAITRESS_HOST = os.getenv('APP_HOST', '0.0.0.0')
 WAITRESS_PORT = int(os.getenv('APP_PORT', '8000'))
 DAPHNE_PORT = int(os.getenv('ASGI_PORT', '8001'))
+HTTPS_PORT = int(os.getenv('HTTPS_PORT', '443'))
+
+CERT_DIR = BASE_DIR / 'certs'
+CERT_FILE = CERT_DIR / 'cert.pem'
+KEY_FILE = CERT_DIR / 'key.pem'
 
 
 def run(command, cwd=BASE_DIR):
@@ -115,41 +120,80 @@ def main():
         # Modo desenvolvimento - usa subprocessos
         run([PYTHON_EXE, 'manage.py', 'migrate'])
 
-        waitress_cmd = [
-            PYTHON_EXE, '-m', 'waitress',
-            f'--listen={WAITRESS_HOST}:{WAITRESS_PORT}',
-            'billar_project.wsgi:application',
-        ]
-        daphne_cmd = [
-            PYTHON_EXE, '-m', 'daphne',
-            '-b', WAITRESS_HOST,
-            '-p', str(DAPHNE_PORT),
-            'billar_project.asgi:application',
-        ]
+        has_ssl = CERT_FILE.exists() and KEY_FILE.exists()
 
-        waitress_proc = subprocess.Popen(waitress_cmd, cwd=BASE_DIR)
-        daphne_proc = subprocess.Popen(daphne_cmd, cwd=BASE_DIR)
+        if has_ssl:
+            # HTTPS mode: single Daphne server handles HTTP + WebSocket over SSL
+            ssl_endpoint = (
+                f'ssl:{HTTPS_PORT}'
+                f':certKey={CERT_FILE}'
+                f':privateKey={KEY_FILE}'
+                f':interface=0.0.0.0'
+            )
+            daphne_cmd = [
+                PYTHON_EXE, '-m', 'daphne',
+                '-e', ssl_endpoint,
+                'billar_project.asgi:application',
+            ]
+            main_proc = subprocess.Popen(daphne_cmd, cwd=BASE_DIR)
 
-        lan_ip = get_local_ip()
-        url = f'http://{lan_ip}:{WAITRESS_PORT}'
+            lan_ip = get_local_ip()
+            url = f'https://{lan_ip}' if HTTPS_PORT == 443 else f'https://{lan_ip}:{HTTPS_PORT}'
 
-        if wait_for_port('127.0.0.1', WAITRESS_PORT):
-            webbrowser.open(url)
+            if wait_for_port('127.0.0.1', HTTPS_PORT):
+                webbrowser.open(url)
 
-        print('Sistema iniciado em:', url)
-        print('Pressione Ctrl+C para encerrar')
+            print(f'Sistema iniciado em: {url}  [HTTPS]')
+            print('Pressione Ctrl+C para encerrar')
 
-        try:
-            while True:
-                time.sleep(1)
-                if waitress_proc.poll() is not None or daphne_proc.poll() is not None:
-                    break
-        except KeyboardInterrupt:
-            pass
-        finally:
-            for process in [waitress_proc, daphne_proc]:
-                if process.poll() is None:
-                    process.terminate()
+            try:
+                while True:
+                    time.sleep(1)
+                    if main_proc.poll() is not None:
+                        break
+            except KeyboardInterrupt:
+                pass
+            finally:
+                if main_proc.poll() is None:
+                    main_proc.terminate()
+        else:
+            # HTTP mode (fallback) - Waitress + Daphne
+            waitress_cmd = [
+                PYTHON_EXE, '-m', 'waitress',
+                f'--listen={WAITRESS_HOST}:{WAITRESS_PORT}',
+                'billar_project.wsgi:application',
+            ]
+            daphne_cmd = [
+                PYTHON_EXE, '-m', 'daphne',
+                '-b', WAITRESS_HOST,
+                '-p', str(DAPHNE_PORT),
+                'billar_project.asgi:application',
+            ]
+
+            waitress_proc = subprocess.Popen(waitress_cmd, cwd=BASE_DIR)
+            daphne_proc = subprocess.Popen(daphne_cmd, cwd=BASE_DIR)
+
+            lan_ip = get_local_ip()
+            url = f'http://{lan_ip}:{WAITRESS_PORT}'
+
+            if wait_for_port('127.0.0.1', WAITRESS_PORT):
+                webbrowser.open(url)
+
+            print(f'Sistema iniciado em: {url}')
+            print('Para ativar HTTPS: execute deploy/windows/setup_ssl.bat como Administrador')
+            print('Pressione Ctrl+C para encerrar')
+
+            try:
+                while True:
+                    time.sleep(1)
+                    if waitress_proc.poll() is not None or daphne_proc.poll() is not None:
+                        break
+            except KeyboardInterrupt:
+                pass
+            finally:
+                for process in [waitress_proc, daphne_proc]:
+                    if process.poll() is None:
+                        process.terminate()
 
         return 0
 

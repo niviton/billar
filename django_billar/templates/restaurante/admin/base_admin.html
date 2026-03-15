@@ -3,31 +3,97 @@
 
 {% block title %}Administração - {{ app_settings.store_name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Manrope:wght@500;600;700;800&display=swap');
+
+    :root {
+        --admin-bg: #f4efe6;
+        --admin-card: #fffdf8;
+        --admin-text: #2b2520;
+        --admin-muted: #7f7367;
+        --admin-line: #decfbd;
+        --admin-accent: #a44a2f;
+        --admin-accent-soft: #f1ddd2;
+        --admin-ok: #2e7a57;
+        --admin-ok-soft: #d9efe4;
+    }
+
+    body {
+        background-color: var(--admin-bg);
+    }
+
+    .admin-shell {
+        background-image: radial-gradient(circle at 20% 10%, rgba(164, 74, 47, 0.05), transparent 34%), radial-gradient(circle at 80% 0%, rgba(46, 122, 87, 0.05), transparent 28%);
+    }
+
+    .admin-brand-title {
+        font-family: 'Fraunces', serif;
+    }
+
+    .admin-ui-font {
+        font-family: 'Manrope', sans-serif;
+    }
+
+    .admin-header {
+        background: rgba(255, 253, 248, 0.93);
+        border-bottom: 1px solid var(--admin-line);
+        backdrop-filter: blur(8px);
+    }
+
+    .admin-sidebar {
+        background: var(--admin-card);
+        border-right: 1px solid var(--admin-line);
+    }
+
+    .admin-link {
+        color: var(--admin-muted);
+        border: 1px solid transparent;
+    }
+
+    .admin-link:hover {
+        background: #f9f2e7;
+        color: var(--admin-text);
+        border-color: #ecdecd;
+    }
+
+    .admin-link.active {
+        background: var(--admin-accent-soft);
+        color: var(--admin-accent);
+        border-color: #e8c7b8;
+        box-shadow: 0 8px 22px -16px rgba(164, 74, 47, 0.7);
+    }
+
+    .admin-main {
+        background: transparent;
+    }
+</style>
+{% endblock %}
+
 {% block navbar %}
-<!-- Header -->
-<header class="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm sticky top-0 z-30">
+<header class="admin-header h-20 flex items-center justify-between px-6 lg:px-8 sticky top-0 z-30 admin-ui-font">
     <div class="flex items-center gap-4">
-        <div class="w-10 h-10 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center border border-slate-200">
+        <div class="w-11 h-11 rounded-2xl overflow-hidden bg-[#f3e6d8] flex items-center justify-center border border-[#e8d4bf]">
             {% if app_settings.logo %}
             <img src="{{ app_settings.logo.url }}" class="w-full h-full object-cover" />
             {% else %}
-            <i class="bi bi-shop text-slate-400"></i>
+            <i class="bi bi-shop text-[#986450]"></i>
             {% endif %}
         </div>
         <div>
-            <h2 class="text-xl font-black tracking-tight text-slate-800 leading-none">{{ app_settings.store_name }}</h2>
+            <h2 class="admin-brand-title text-2xl text-[var(--admin-text)] leading-none">{{ app_settings.store_name }}</h2>
             <div class="flex items-center gap-2 mt-1">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Administração</span>
+                <span class="w-2 h-2 rounded-full bg-[var(--admin-ok)] animate-pulse"></span>
+                <span class="text-[10px] font-extrabold text-[var(--admin-muted)] uppercase tracking-[0.18em]">Administração</span>
             </div>
         </div>
     </div>
 
-    <div class="flex items-center gap-6">
+    <div class="flex items-center gap-4 lg:gap-6">
         <form method="post" action="{% url 'toggle_store_status' %}" class="hidden md:block" data-confirm-message="{% if app_settings.is_store_open %}Fechar a loja agora?{% else %}Abrir a loja agora?{% endif %}">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}" />
-            <button type="submit" class="px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all {% if app_settings.is_store_open %}bg-emerald-100 text-emerald-700 hover:bg-emerald-200{% else %}bg-red-100 text-red-700 hover:bg-red-200{% endif %}">
+            <button type="submit" class="px-4 py-2 rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all {% if app_settings.is_store_open %}bg-[var(--admin-ok-soft)] text-[var(--admin-ok)] hover:brightness-95{% else %}bg-[#f6ddd2] text-[var(--admin-accent)] hover:brightness-95{% endif %}">
                 {% if app_settings.is_store_open %}
                 <i class="bi bi-door-open me-1"></i>Fechar Loja
                 {% else %}
@@ -36,62 +102,60 @@
             </button>
         </form>
         <div class="text-right hidden md:block">
-            <p class="text-sm font-bold text-slate-700">{{ user.username }}</p>
-            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{{ user.role }}</p>
+            <p class="text-sm font-extrabold text-[var(--admin-text)]">{{ user.username }}</p>
+            <p class="text-[10px] text-[var(--admin-muted)] font-extrabold uppercase tracking-[0.18em]">{{ user.role }}</p>
         </div>
-        <a href="{% url 'logout' %}" class="p-3 bg-slate-100 text-slate-500 rounded-2xl hover:bg-red-50 hover:text-red-600 transition-all group border border-transparent hover:border-red-100">
-            <i class="bi bi-box-arrow-right text-lg group-hover:rotate-12 transition-transform"></i>
+        <a href="{% url 'logout' %}" class="p-3 bg-[#f2e7da] text-[#8f5a45] rounded-2xl hover:bg-[#f0dbcf] transition-all border border-transparent hover:border-[#e7c9b8]">
+            <i class="bi bi-box-arrow-right text-lg"></i>
         </a>
     </div>
 </header>
 {% endblock %}
 
 {% block content %}
-<div class="flex min-h-[calc(100vh-5rem)]">
-    <!-- Sidebar -->
-    <nav class="w-72 bg-white border-r border-slate-200 flex flex-col p-6 gap-2 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)]">
-        <div class="mb-6 px-4">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Menu Principal</p>
+<div class="admin-shell flex min-h-[calc(100vh-5rem)] admin-ui-font">
+    <nav class="admin-sidebar w-72 flex flex-col p-6 gap-2 shadow-[8px_0_22px_-16px_rgba(73,49,33,0.3)]">
+        <div class="mb-6 px-3">
+            <p class="text-xs font-extrabold text-[var(--admin-muted)] uppercase tracking-[0.18em]">Menu Principal</p>
         </div>
-        
-        <a href="{% url 'admin_dashboard' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'dashboard' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i class="bi bi-grid-1x2 text-lg {% if active_menu == 'dashboard' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+
+        <a href="{% url 'admin_dashboard' %}" class="admin-link {% if active_menu == 'dashboard' %}active{% endif %} flex items-center gap-4 px-4 py-3 rounded-2xl font-extrabold text-sm transition-all">
+            <i class="bi bi-grid-1x2 text-lg"></i>
             Dashboard
         </a>
-        
-        <a href="{% url 'admin_reports' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'reports' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i class="bi bi-bar-chart text-lg {% if active_menu == 'reports' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+
+        <a href="{% url 'admin_reports' %}" class="admin-link {% if active_menu == 'reports' %}active{% endif %} flex items-center gap-4 px-4 py-3 rounded-2xl font-extrabold text-sm transition-all">
+            <i class="bi bi-bar-chart text-lg"></i>
             Relatórios
         </a>
-        
-        <a href="{% url 'admin_menu' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'menu' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i class="bi bi-bag text-lg {% if active_menu == 'menu' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+
+        <a href="{% url 'admin_menu' %}" class="admin-link {% if active_menu == 'menu' %}active{% endif %} flex items-center gap-4 px-4 py-3 rounded-2xl font-extrabold text-sm transition-all">
+            <i class="bi bi-bag text-lg"></i>
             Cardápio
         </a>
 
-        <a href="{% url 'admin_ingredients' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'ingredients' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i class="bi bi-box-seam text-lg {% if active_menu == 'ingredients' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+        <a href="{% url 'admin_ingredients' %}" class="admin-link {% if active_menu == 'ingredients' %}active{% endif %} flex items-center gap-4 px-4 py-3 rounded-2xl font-extrabold text-sm transition-all">
+            <i class="bi bi-box-seam text-lg"></i>
             Ingredientes
         </a>
-        
-        <a href="{% url 'admin_users' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'users' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i class="bi bi-people text-lg {% if active_menu == 'users' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+
+        <a href="{% url 'admin_users' %}" class="admin-link {% if active_menu == 'users' %}active{% endif %} flex items-center gap-4 px-4 py-3 rounded-2xl font-extrabold text-sm transition-all">
+            <i class="bi bi-people text-lg"></i>
             Equipe
         </a>
-        
-        <a href="{% url 'admin_online_orders' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'online' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i class="bi bi-phone text-lg {% if active_menu == 'online' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+
+        <a href="{% url 'admin_online_orders' %}" class="admin-link {% if active_menu == 'online' %}active{% endif %} flex items-center gap-4 px-4 py-3 rounded-2xl font-extrabold text-sm transition-all">
+            <i class="bi bi-phone text-lg"></i>
             Pedidos Online
         </a>
-        
-        <a href="{% url 'admin_settings' %}" class="flex items-center gap-4 px-5 py-4 rounded-2xl font-bold text-sm transition-all group {% if active_menu == 'settings' %}bg-slate-900 text-white shadow-lg shadow-slate-900/20{% else %}text-slate-500 hover:bg-slate-50 hover:text-slate-900{% endif %}">
-            <i class="bi bi-gear text-lg {% if active_menu == 'settings' %}text-white{% else %}text-slate-400 group-hover:text-slate-900{% endif %}"></i>
+
+        <a href="{% url 'admin_settings' %}" class="admin-link {% if active_menu == 'settings' %}active{% endif %} flex items-center gap-4 px-4 py-3 rounded-2xl font-extrabold text-sm transition-all">
+            <i class="bi bi-gear text-lg"></i>
             Configurações
         </a>
     </nav>
 
-    <!-- Main Content -->
-    <main class="flex-1 p-8 overflow-y-auto bg-slate-50/50">
+    <main class="admin-main flex-1 p-6 lg:p-8 overflow-y-auto">
         {% block admin_content %}{% endblock %}
     </main>
 </div>

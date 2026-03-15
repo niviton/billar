@@ -24,6 +24,8 @@ urlpatterns = [
     
     # Admin - Dashboard
     path('admin-panel/', views.admin_dashboard, name='admin_dashboard'),
+    path('admin-panel/cash/open/', views.open_cash_session, name='open_cash_session'),
+    path('admin-panel/cash/close/', views.close_cash_session, name='close_cash_session'),
     
     # Admin - Relatórios
     path('admin-panel/reports/', views.admin_reports, name='admin_reports'),
@@ -67,4 +69,7 @@ urlpatterns = [
     path('api/cart/remove/<int:product_id>/', views.api_remove_from_cart, name='api_remove_from_cart'),
     path('api/cart/', views.api_get_cart, name='api_get_cart'),
     path('api/cart/clear/', views.api_clear_cart, name='api_clear_cart'),
+
+    # Certificado SSL para instalação em outros dispositivos
+    path('download-ca-cert', views.download_ca_cert, name='download_ca_cert'),
 ]

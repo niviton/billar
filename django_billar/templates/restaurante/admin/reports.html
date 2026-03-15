@@ -4,17 +4,21 @@
 
 {% block admin_content %}
 <div class="max-w-[1400px] mx-auto">
-    <!-- Título -->
+    <!-- Titulo -->
     <div class="flex items-center justify-between mb-8">
         <div>
-            <h1 class="text-3xl font-black text-slate-800">Relatórios</h1>
-            <p class="text-slate-500">Acompanhe o desempenho do seu negócio</p>
+            <h1 class="admin-brand-title text-4xl text-[var(--admin-text)]">Relatorios</h1>
+            <p class="text-[var(--admin-muted)] font-semibold">Acompanhe o desempenho do seu negocio</p>
         </div>
         
         <!-- Filtro por Calendário -->
         <div class="bg-white rounded-2xl border border-slate-200 p-3 flex flex-wrap items-end gap-3">
             <form method="get" class="flex items-end gap-2">
                 <input type="hidden" name="filter" value="day" />
+                {% if history_search %}<input type="hidden" name="history_search" value="{{ history_search }}" />{% endif %}
+                <input type="hidden" name="page_size" value="{{ page_size }}" />
+                <input type="hidden" name="start_date" value="{{ selected_start_date }}" />
+                <input type="hidden" name="end_date" value="{{ selected_end_date }}" />
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Dia</label>
                     <input type="date" name="day" value="{{ selected_day }}" class="px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700" />
@@ -24,6 +28,12 @@
 
             <form method="get" class="flex items-end gap-2">
                 <input type="hidden" name="filter" value="month" />
+                {% if history_search %}<input type="hidden" name="history_search" value="{{ history_search }}" />{% endif %}
+                <input type="hidden" name="page_size" value="{{ page_size }}" />
+                <input type="hidden" name="start_date" value="{{ selected_start_date }}" />
+                <input type="hidden" name="end_date" value="{{ selected_end_date }}" />
+                <input type="hidden" name="start_date" value="{{ selected_start_date }}" />
+                <input type="hidden" name="end_date" value="{{ selected_end_date }}" />
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Mês</label>
                     <input type="month" name="month" value="{{ selected_month }}" class="px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700" />
@@ -33,6 +43,23 @@
 
             <form method="get" class="flex items-end gap-2">
                 <input type="hidden" name="filter" value="year" />
+
+            <form method="get" class="flex items-end gap-2">
+                <input type="hidden" name="filter" value="range" />
+                {% if history_search %}<input type="hidden" name="history_search" value="{{ history_search }}" />{% endif %}
+                <input type="hidden" name="page_size" value="{{ page_size }}" />
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Inicio</label>
+                    <input type="date" name="start_date" value="{{ selected_start_date }}" class="px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700" />
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Fim</label>
+                    <input type="date" name="end_date" value="{{ selected_end_date }}" class="px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700" />
+                </div>
+                <button type="submit" class="px-3 py-2 rounded-xl text-sm font-bold {% if filter_type == 'range' %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">Periodo</button>
+            </form>
+                {% if history_search %}<input type="hidden" name="history_search" value="{{ history_search }}" />{% endif %}
+                <input type="hidden" name="page_size" value="{{ page_size }}" />
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Ano</label>
                     <select name="year" class="px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700">
@@ -47,52 +74,52 @@
     </div>
     
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
         <!-- Faturamento -->
-        <div class="bg-gradient-to-br from-emerald-500 to-green-600 rounded-3xl p-6 text-white">
+        <div class="rounded-3xl p-6 border border-[#cde3d7] bg-[#eef8f3] text-[var(--admin-text)] shadow-[0_20px_45px_-28px_rgba(46,122,87,0.4)]">
             <div class="flex items-center justify-between mb-4">
-                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <div class="w-12 h-12 bg-[#d8ecdf] rounded-xl flex items-center justify-center text-[var(--admin-ok)]">
                     <i class="bi bi-currency-dollar text-2xl"></i>
                 </div>
-                <i class="bi bi-graph-up-arrow text-2xl opacity-50"></i>
+                <i class="bi bi-graph-up-arrow text-2xl text-[#5f886f]"></i>
             </div>
-            <p class="text-4xl font-black">R$ {{ total_revenue|floatformat:2 }}</p>
-            <p class="text-sm opacity-70 mt-1">Faturamento Total</p>
+            <p class="text-4xl font-black text-[#275f45]">R$ {{ total_revenue|floatformat:2 }}</p>
+            <p class="text-sm font-semibold text-[#55806a] mt-1">Faturamento Total</p>
         </div>
-        
+
         <!-- Pedidos -->
-        <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl p-6 text-white">
+        <div class="rounded-3xl p-6 border border-[#e7d6bd] bg-[#fff9ee] text-[var(--admin-text)] shadow-[0_20px_45px_-28px_rgba(161,125,57,0.45)]">
             <div class="flex items-center justify-between mb-4">
-                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <div class="w-12 h-12 bg-[#f7e9cc] rounded-xl flex items-center justify-center text-[#9d7b2f]">
                     <i class="bi bi-receipt text-2xl"></i>
                 </div>
-                <i class="bi bi-bar-chart text-2xl opacity-50"></i>
+                <i class="bi bi-bar-chart text-2xl text-[#9f8850]"></i>
             </div>
-            <p class="text-4xl font-black">{{ total_orders }}</p>
-            <p class="text-sm opacity-70 mt-1">Pedidos Finalizados</p>
+            <p class="text-4xl font-black text-[#5a4b22]">{{ total_orders }}</p>
+            <p class="text-sm font-semibold text-[#8f7d49] mt-1">Pedidos Finalizados</p>
         </div>
-        
-        <!-- Ticket Médio -->
-        <div class="bg-gradient-to-br from-purple-500 to-pink-600 rounded-3xl p-6 text-white">
+
+        <!-- Ticket Medio -->
+        <div class="rounded-3xl p-6 border border-[#e9c7b8] bg-[#fff3eb] text-[var(--admin-text)] shadow-[0_20px_45px_-28px_rgba(164,74,47,0.55)]">
             <div class="flex items-center justify-between mb-4">
-                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <div class="w-12 h-12 bg-[#f3d3c5] rounded-xl flex items-center justify-center text-[var(--admin-accent)]">
                     <i class="bi bi-tag text-2xl"></i>
                 </div>
-                <i class="bi bi-cash-stack text-2xl opacity-50"></i>
+                <i class="bi bi-cash-stack text-2xl text-[#a56a54]"></i>
             </div>
-            <p class="text-4xl font-black">R$ {{ ticket_medio|floatformat:2 }}</p>
-            <p class="text-sm opacity-70 mt-1">Ticket Médio</p>
+            <p class="text-4xl font-black text-[#7f2f1a]">R$ {{ ticket_medio|floatformat:2 }}</p>
+            <p class="text-sm font-semibold text-[#9d6f5d] mt-1">Ticket Medio</p>
         </div>
     </div>
     
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Ranking de Garçons -->
-        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+        <!-- Ranking de Garcons -->
+        <div class="bg-[var(--admin-card)] rounded-3xl p-6 border border-[var(--admin-line)] shadow-[0_20px_50px_-36px_rgba(66,47,28,0.55)]">
             <div class="flex items-center gap-3 mb-6">
                 <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
                     <i class="bi bi-trophy text-amber-600"></i>
                 </div>
-                <h2 class="text-lg font-black text-slate-800">Ranking de Garçons</h2>
+                <h2 class="admin-brand-title text-2xl text-[var(--admin-text)]">Ranking de Garcons</h2>
             </div>
             
             <div class="space-y-4">
@@ -119,12 +146,12 @@
         </div>
         
         <!-- Produtos Mais Vendidos -->
-        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+        <div class="bg-[var(--admin-card)] rounded-3xl p-6 border border-[var(--admin-line)] shadow-[0_20px_50px_-36px_rgba(66,47,28,0.55)]">
             <div class="flex items-center gap-3 mb-6">
                 <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                     <i class="bi bi-star text-emerald-600"></i>
                 </div>
-                <h2 class="text-lg font-black text-slate-800">Produtos Mais Vendidos</h2>
+                <h2 class="admin-brand-title text-2xl text-[var(--admin-text)]">Produtos Mais Vendidos</h2>
             </div>
             
             <div class="space-y-4">
@@ -148,6 +175,193 @@
                 {% endfor %}
             </div>
         </div>
+    </div>
+
+    <div class="mt-8 bg-[var(--admin-card)] rounded-3xl p-6 border border-[var(--admin-line)] shadow-[0_20px_50px_-36px_rgba(66,47,28,0.55)]">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-list-check text-emerald-700"></i>
+                </div>
+                <div>
+                    <h2 class="admin-brand-title text-2xl text-[var(--admin-text)]">Quantidade Vendida Por Produto</h2>
+                    <p class="text-xs text-slate-400">Resumo completo no periodo selecionado</p>
+                </div>
+            </div>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total de itens vendidos: {{ total_items_sold }}</span>
+        </div>
+
+        <div class="overflow-x-auto rounded-2xl border border-slate-100">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50">
+                    <tr class="text-left text-slate-500">
+                        <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Produto</th>
+                        <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Quantidade Vendida</th>
+                        <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Pedidos Com Esse Item</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in product_quantities %}
+                    <tr class="border-t border-slate-100">
+                        <td class="px-4 py-3 text-slate-800 font-semibold">
+                            <span class="mr-2">{{ product.product__icon|default:"🍔" }}</span>{{ product.product__name }}
+                        </td>
+                        <td class="px-4 py-3 text-slate-900 font-black">{{ product.total_qty }}x</td>
+                        <td class="px-4 py-3 text-slate-600 font-semibold">{{ product.orders_count }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="px-4 py-10 text-center text-slate-400 font-medium">Nenhum item vendido no periodo selecionado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="mt-8 bg-[var(--admin-card)] rounded-3xl p-6 border border-[var(--admin-line)] shadow-[0_20px_50px_-36px_rgba(66,47,28,0.55)]">
+        <div class="flex items-center justify-between gap-3 mb-6">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-clock-history text-blue-600"></i>
+                </div>
+                <div>
+                    <h2 class="admin-brand-title text-2xl text-[var(--admin-text)]">Historico de Vendas</h2>
+                    <p class="text-xs text-slate-400">Pedidos finalizados no periodo selecionado</p>
+                </div>
+            </div>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">{{ history_total }} registros</span>
+        </div>
+
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+            <form method="get" class="flex flex-wrap items-center gap-2">
+                <input type="hidden" name="filter" value="{{ filter_type }}" />
+                <input type="hidden" name="day" value="{{ selected_day }}" />
+                <input type="hidden" name="month" value="{{ selected_month }}" />
+                <input type="hidden" name="year" value="{{ selected_year }}" />
+                <input type="hidden" name="start_date" value="{{ selected_start_date }}" />
+                <input type="hidden" name="end_date" value="{{ selected_end_date }}" />
+                <input type="hidden" name="page_size" value="{{ page_size }}" />
+                <input
+                    type="text"
+                    name="history_search"
+                    value="{{ history_search }}"
+                    placeholder="Buscar por nome do cliente"
+                    class="w-full sm:w-80 px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700"
+                />
+                <button type="submit" class="px-3 py-2 rounded-xl text-sm font-bold bg-slate-900 text-white hover:bg-slate-700">Buscar</button>
+                {% if history_search %}
+                <a href="?filter={{ filter_type }}&day={{ selected_day }}&month={{ selected_month }}&year={{ selected_year }}&start_date={{ selected_start_date }}&end_date={{ selected_end_date }}&page_size={{ page_size }}" class="px-3 py-2 rounded-xl text-sm font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">Limpar</a>
+                {% endif %}
+            </form>
+
+            <div class="flex flex-wrap items-center gap-2">
+                <form method="get" class="flex items-center gap-2">
+                    <input type="hidden" name="filter" value="{{ filter_type }}" />
+                    <input type="hidden" name="day" value="{{ selected_day }}" />
+                    <input type="hidden" name="month" value="{{ selected_month }}" />
+                    <input type="hidden" name="year" value="{{ selected_year }}" />
+                    <input type="hidden" name="start_date" value="{{ selected_start_date }}" />
+                    <input type="hidden" name="end_date" value="{{ selected_end_date }}" />
+                    {% if history_search %}<input type="hidden" name="history_search" value="{{ history_search }}" />{% endif %}
+                    <label class="text-xs font-bold text-slate-500">Itens:</label>
+                    <select name="page_size" onchange="this.form.submit()" class="px-2 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+                        {% for size in page_size_options %}
+                        <option value="{{ size }}" {% if page_size == size %}selected{% endif %}>{{ size }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+
+                <a href="?{{ base_query_string }}{% if base_query_string %}&{% endif %}export=csv" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
+                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                    Exportar CSV
+                </a>
+                <a href="?{{ base_query_string }}{% if base_query_string %}&{% endif %}export=pdf" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                    Exportar PDF
+                </a>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-2xl border border-slate-100">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50">
+                    <tr class="text-left text-slate-500">
+                        <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Data</th>
+                        <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Nome</th>
+                        <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">O que foi vendido</th>
+                        <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Valor</th>
+                        <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Nota</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in sales_history %}
+                    <tr class="border-t border-slate-100 align-top">
+                        <td class="px-4 py-3 text-slate-600 whitespace-nowrap">
+                            <p class="font-semibold">{{ order.created_at|date:"d/m/Y" }}</p>
+                            <p class="text-xs text-slate-400">{{ order.created_at|date:"H:i" }} - #{{ order.id }}</p>
+                        </td>
+                        <td class="px-4 py-3 text-slate-700">
+                            <p class="font-semibold">
+                                {% if order.cliente %}
+                                    {{ order.cliente }}
+                                {% elif order.order_type == 'delivery' %}
+                                    Cliente delivery
+                                {% else %}
+                                    Mesa {{ order.mesa }}
+                                {% endif %}
+                            </p>
+                            <p class="text-xs text-slate-400">
+                                {% if order.order_type == 'delivery' %}
+                                    Delivery
+                                {% else %}
+                                    Mesa {{ order.mesa }}
+                                {% endif %}
+                                {% if order.waiter %} - {{ order.waiter.username }}{% endif %}
+                            </p>
+                        </td>
+                        <td class="px-4 py-3 text-slate-700">
+                            <div class="space-y-1">
+                                {% for item in order.items.all %}
+                                <p class="text-xs md:text-sm">
+                                    <span class="font-bold">{{ item.quantity }}x</span> {{ item.product.name }}
+                                    <span class="text-slate-400">(R$ {{ item.subtotal|floatformat:2 }})</span>
+                                </p>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-slate-800 font-black whitespace-nowrap">R$ {{ order.total|floatformat:2 }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <a href="{% url 'print_order' order.id %}" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-700 transition-colors">
+                                <i class="bi bi-printer"></i>
+                                Reimprimir
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-4 py-10 text-center text-slate-400 font-medium">Nenhuma venda finalizada no periodo selecionado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if sales_history.paginator.num_pages > 1 %}
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs text-slate-500">
+                Pagina {{ sales_history.number }} de {{ sales_history.paginator.num_pages }}
+            </p>
+            <div class="flex items-center gap-2">
+                {% if sales_history.has_previous %}
+                <a href="?{{ base_query_string }}{% if base_query_string %}&{% endif %}page={{ sales_history.previous_page_number }}" class="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">Anterior</a>
+                {% endif %}
+                {% if sales_history.has_next %}
+                <a href="?{{ base_query_string }}{% if base_query_string %}&{% endif %}page={{ sales_history.next_page_number }}" class="px-3 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-700">Proxima</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

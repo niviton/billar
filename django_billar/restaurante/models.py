@@ -266,7 +266,11 @@ class OrderItem(models.Model):
 
     @property
     def subtotal(self):
-        return self.quantity * self.unit_price
+        try:
+            additionals_extra = sum(a.unit_price for a in self.additionals.all())
+        except Exception:
+            additionals_extra = Decimal('0')
+        return self.quantity * (self.unit_price + additionals_extra)
 
     def save(self, *args, **kwargs):
         if not self.unit_price:
@@ -318,3 +322,126 @@ class AppSettings(models.Model):
     def get_settings(cls):
         obj, created = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class AuditLog(models.Model):
+    """Rastro de auditoria para ações sensíveis do sistema."""
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs', verbose_name='Usuário')
+    action = models.CharField(max_length=100, verbose_name='Ação')
+    model_name = models.CharField(max_length=80, blank=True, verbose_name='Modelo')
+    object_id = models.CharField(max_length=64, blank=True, verbose_name='ID do objeto')
+    description = models.TextField(blank=True, verbose_name='Descrição')
+    metadata = models.JSONField(default=dict, blank=True, verbose_name='Dados extras')
+    ip_address = models.CharField(max_length=45, blank=True, verbose_name='IP')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Log de Auditoria'
+        verbose_name_plural = 'Logs de Auditoria'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.action} ({self.created_at:%d/%m/%Y %H:%M})"
+
+
+class IngredientStockMovement(models.Model):
+    """Histórico de movimentações de estoque de ingredientes."""
+    MOVEMENT_CHOICES = [
+        ('entrada', 'Entrada'),
+        ('consumo', 'Consumo'),
+        ('ajuste', 'Ajuste'),
+        ('perda', 'Perda'),
+        ('estorno', 'Estorno'),
+    ]
+
+    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, related_name='stock_movements', verbose_name='Ingrediente')
+    movement_type = models.CharField(max_length=20, choices=MOVEMENT_CHOICES, verbose_name='Tipo')
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, verbose_name='Quantidade')
+    quantity_before = models.DecimalField(max_digits=12, decimal_places=3, default=0, verbose_name='Estoque antes')
+    quantity_after = models.DecimalField(max_digits=12, decimal_places=3, default=0, verbose_name='Estoque depois')
+    reason = models.CharField(max_length=255, blank=True, verbose_name='Motivo')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='ingredient_movements', verbose_name='Usuário')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Movimentação de Ingrediente'
+        verbose_name_plural = 'Movimentações de Ingredientes'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.ingredient.name} - {self.get_movement_type_display()} ({self.quantity})"
+
+
+class CashSession(models.Model):
+    """Controle de caixa por turno."""
+    STATUS_CHOICES = [
+        ('open', 'Aberto'),
+        ('closed', 'Fechado'),
+    ]
+
+    opened_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='cash_sessions_opened', verbose_name='Aberto por')
+    closed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='cash_sessions_closed', verbose_name='Fechado por')
+    opening_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Valor de abertura')
+    closing_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Valor de fechamento')
+    expected_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Valor esperado')
+    difference_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Diferença')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='open', verbose_name='Status')
+    notes = models.TextField(blank=True, verbose_name='Observações')
+    opened_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Sessão de Caixa'
+        verbose_name_plural = 'Sessões de Caixa'
+        ordering = ['-opened_at']
+
+    def __str__(self):
+        return f"Caixa {self.get_status_display()} - {self.opened_at:%d/%m/%Y %H:%M}"
+
+    @classmethod
+    def get_open_session(cls):
+        return cls.objects.filter(status='open').order_by('-opened_at').first()
+
+
+class Additional(models.Model):
+    """Adicional de produto (ex: queijo extra, bacon)"""
+    name = models.CharField(max_length=100, verbose_name='Nome')
+    sale_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Preço de Venda')
+    is_active = models.BooleanField(default=True, verbose_name='Ativo')
+    order = models.IntegerField(default=0, verbose_name='Ordem de exibição')
+
+    class Meta:
+        verbose_name = 'Adicional'
+        verbose_name_plural = 'Adicionais'
+        ordering = ['order', 'name']
+
+    def __str__(self):
+        return f"{self.name} (+R$ {self.sale_price:.2f})"
+
+
+class ProductAdditional(models.Model):
+    """Adicionais disponíveis para um produto específico"""
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='available_additionals', verbose_name='Produto')
+    additional = models.ForeignKey(Additional, on_delete=models.CASCADE, related_name='product_links', verbose_name='Adicional')
+
+    class Meta:
+        verbose_name = 'Adicional do Produto'
+        verbose_name_plural = 'Adicionais do Produto'
+        unique_together = ('product', 'additional')
+
+    def __str__(self):
+        return f"{self.product.name} → {self.additional.name}"
+
+
+class OrderItemAdditional(models.Model):
+    """Adicional selecionado em um item do pedido"""
+    order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE, related_name='additionals', verbose_name='Item do Pedido')
+    additional = models.ForeignKey(Additional, on_delete=models.CASCADE, verbose_name='Adicional')
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Preço Unitário')
+
+    class Meta:
+        verbose_name = 'Adicional do Item'
+        verbose_name_plural = 'Adicionais do Item'
+
+    def __str__(self):
+        return f"{self.order_item} + {self.additional.name}"

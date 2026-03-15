@@ -1,6 +1,18 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, Category, Product, Order, OrderItem, AppSettings, Ingredient, ProductIngredient
+from .models import (
+    User,
+    Category,
+    Product,
+    Order,
+    OrderItem,
+    AppSettings,
+    Ingredient,
+    ProductIngredient,
+    AuditLog,
+    IngredientStockMovement,
+    CashSession,
+)
 
 
 @admin.register(User)
@@ -65,3 +77,27 @@ class AppSettingsAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ['created_at', 'action', 'user', 'model_name', 'object_id']
+    list_filter = ['action', 'model_name', 'created_at']
+    search_fields = ['description', 'user__username', 'object_id']
+    readonly_fields = ['created_at']
+
+
+@admin.register(IngredientStockMovement)
+class IngredientStockMovementAdmin(admin.ModelAdmin):
+    list_display = ['created_at', 'ingredient', 'movement_type', 'quantity', 'quantity_before', 'quantity_after', 'created_by']
+    list_filter = ['movement_type', 'created_at']
+    search_fields = ['ingredient__name', 'reason', 'created_by__username']
+    readonly_fields = ['created_at']
+
+
+@admin.register(CashSession)
+class CashSessionAdmin(admin.ModelAdmin):
+    list_display = ['opened_at', 'status', 'opening_amount', 'closing_amount', 'expected_amount', 'difference_amount', 'opened_by', 'closed_by']
+    list_filter = ['status', 'opened_at']
+    search_fields = ['opened_by__username', 'closed_by__username', 'notes']
+    readonly_fields = ['opened_at', 'closed_at']

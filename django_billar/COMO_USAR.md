@@ -141,6 +141,39 @@ cd dist\SistemaRestaurante
 
 ---
 
+## 💾 Backup Automático do Banco no Git (SQLite)
+
+Se quiser salvar o banco automaticamente para não perder dados, use a automação já pronta:
+
+1. Entre na pasta do projeto:
+   ```powershell
+   cd django_billar
+   ```
+
+2. Instale a tarefa automática (Windows):
+   ```powershell
+   .\deploy\windows\instalar_backup_git_automatico.bat
+   ```
+
+3. O sistema passará a executar a cada 30 minutos:
+   - cópia do `db.sqlite3` para `backups\db\`
+   - commit automático no Git
+   - `git push` para a branch atual
+
+4. Log da automação:
+   - `backups\logs\db_backup_git_push.log`
+
+### Pré-requisitos importantes
+1. O repositório precisa estar conectado ao remoto (`origin`).
+2. O `git push` precisa funcionar sem pedir senha (Git Credential Manager / token já salvo).
+
+### Remover a automação
+```powershell
+schtasks /Delete /TN "Billar-DB-Backup-GitPush" /F
+```
+
+---
+
 ## 📁 Estrutura de Arquivos
 
 ```

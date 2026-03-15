@@ -89,7 +89,7 @@
                                     type="text" 
                                     name="mesa"
                                     class="w-full bg-transparent font-bold text-xl text-slate-800 outline-none"
-                                    placeholder="00"
+                                    placeholder="00 (opcional)"
                                 />
                             </div>
                         </div>
@@ -106,11 +106,12 @@
                                     type="text" 
                                     name="cliente"
                                     class="w-full bg-transparent font-bold text-xl text-slate-800 outline-none"
-                                    placeholder="Nome do cliente"
+                                    placeholder="Nome do cliente (opcional)"
                                 />
                             </div>
                         </div>
                     </div>
+                    <p class="text-xs font-semibold text-slate-500 -mt-2">Preencha a mesa ou o nome do cliente.</p>
                     
                     <!-- Delivery Fields -->
                     <div id="deliveryFields" class="hidden flex flex-col gap-4">
@@ -188,9 +189,8 @@
                             </span>
                         </div>
                         <button type="button"
-                            data-cart-action="add"
                             data-product-id="{{ product.id }}"
-                            onclick="handleCartAction('add', '{{ product.id }}', this); return false;"
+                            onclick="handleCartAction('add', {{ product.id }}, this); return false;"
                             class="mt-3 w-full py-2 rounded-xl text-xs font-bold uppercase tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition-all">
                             Add Pedido
                         </button>
@@ -262,16 +262,19 @@
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
+// ---- APIs ----
 const cartApi = {
     add: "{% url 'api_add_to_cart' 0 %}",
     remove: "{% url 'api_remove_from_cart' 0 %}",
     clear: "{% url 'api_clear_cart' %}",
 };
 
+// ---- Helpers ----
 function toggleOrderType() {
     const isDineIn = document.querySelector('input[name="order_type"]:checked').value === 'dine-in';
     document.getElementById('dineInFields').classList.toggle('hidden', !isDineIn);
@@ -349,20 +352,20 @@ function cartItemHtml(item) {
         : `<span class="text-2xl">${item.icon || '🍔'}</span>`;
 
     return `
-        <div class="flex items-center gap-3 py-3 border-b border-slate-50">
-            <div class="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center bg-slate-50">
+        <div class="flex items-start gap-3 py-3 border-b border-slate-50">
+            <div class="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center bg-slate-50 flex-shrink-0">
                 ${media}
             </div>
             <div class="flex-1 min-w-0">
                 <p class="font-bold text-slate-800 text-sm truncate">${item.name}</p>
-                <p class="text-slate-400 text-xs">R$ ${Number(item.price).toFixed(2)} x ${item.qty}</p>
+                <p class="text-slate-400 text-xs mt-0.5">R$ ${Number(item.price).toFixed(2)} × ${item.qty}</p>
             </div>
-            <div class="flex items-center gap-1">
-                <button type="button" data-cart-action="remove" data-product-id="${item.id}" onclick="handleCartAction('remove', '${item.id}', this); return false;" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all">
+            <div class="flex items-center gap-1 flex-shrink-0 pt-1">
+                <button type="button" onclick="handleCartAction('remove', ${item.id}, this)" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all">
                     <i class="bi bi-dash"></i>
                 </button>
                 <span class="w-8 text-center font-bold text-slate-800">${item.qty}</span>
-                <button type="button" data-cart-action="add" data-product-id="${item.id}" onclick="handleCartAction('add', '${item.id}', this); return false;" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-600 transition-all">
+                <button type="button" onclick="handleCartAction('add', ${item.id}, this)" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-600 transition-all">
                     <i class="bi bi-plus"></i>
                 </button>
             </div>
@@ -397,7 +400,8 @@ function renderCart(cart, total) {
     }
 
     cartItemsContainer.innerHTML = cart.map(cartItemHtml).join('');
-    cartTotalValue.textContent = formatCurrency(total);
+    const computedTotal = total ?? cart.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
+    cartTotalValue.textContent = formatCurrency(computedTotal);
     cartFooter.classList.remove('hidden');
     clearCartBtn.classList.remove('hidden');
 }
@@ -418,6 +422,7 @@ async function postCart(url) {
     return response.json();
 }
 
+// ---- Ação de add direto (sem adicionais) ----
 async function handleCartAction(action, productId, sourceEl = null) {
     try {
         if (sourceEl) {
@@ -440,14 +445,10 @@ async function handleCartAction(action, productId, sourceEl = null) {
             return;
         }
 
-        const total = data.total ?? data.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-        renderCart(data.cart, total);
+        renderCart(data.cart, data.total);
 
         if (action === 'add') {
             showWaiterQuickFeedback(`${productName} adicionado ao pedido`, 'success');
-            showToast(`${productName} adicionado`, 'success', 1200);
-        } else if (action === 'remove') {
-            showWaiterQuickFeedback('Item removido do pedido', 'warning');
         } else if (action === 'clear') {
             showWaiterQuickFeedback('Carrinho limpo', 'info');
         }
@@ -455,6 +456,10 @@ async function handleCartAction(action, productId, sourceEl = null) {
         console.error(error);
         showWaiterQuickFeedback('Falha ao atualizar o pedido', 'error');
     }
+}
+
+function handleProductAdd(productId, name, price, icon, image, btn) {
+    handleCartAction('add', productId, btn);
 }
 
 function saveWaiterDraft() {
@@ -528,7 +533,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const form = document.getElementById('orderForm');
     if (form) {
-        form.addEventListener('submit', function() {
+        form.addEventListener('submit', function(event) {
+            const orderType = document.querySelector('input[name="order_type"]:checked')?.value || 'dine-in';
+            const mesa = (document.getElementById('mesaInput')?.value || '').trim();
+            const cliente = (document.getElementById('clienteInput')?.value || '').trim();
+
+            if (orderType === 'dine-in' && !mesa && !cliente) {
+                event.preventDefault();
+                showWaiterQuickFeedback('Informe mesa ou nome do cliente', 'warning');
+                showToast('Informe mesa ou nome do cliente', 'warning', 1800);
+                return;
+            }
+
             localStorage.removeItem('waiterOrderDraft');
         });
     }
