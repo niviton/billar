@@ -166,33 +166,33 @@
             </form>
             
             <!-- Produtos -->
-            <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6 mt-6">
+            <div class="grid gap-2 md:gap-4 lg:gap-6 mt-6" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
                 {% for category in categories %}
                     {% for product in category.products.all %}
-                    <div data-product-name="{{ product.name|escapejs }}" class="group p-4 rounded-[2rem] border transition-all relative flex flex-col items-center text-center overflow-hidden touch-manipulation {% if product.available_stock > 0 %}bg-white border-slate-200 hover:border-red-200 hover:shadow-xl hover:shadow-red-500/5{% else %}bg-slate-100 border-red-200 opacity-60 grayscale pointer-events-none{% endif %}">
+                    <div data-product-name="{{ product.name|escapejs }}" class="group p-2 md:p-4 rounded-2xl border transition-all relative flex flex-col items-center text-center overflow-hidden touch-manipulation {% if product.available_stock > 0 %}bg-white border-slate-200 hover:border-red-200 hover:shadow-xl hover:shadow-red-500/5{% else %}bg-slate-100 border-red-200 opacity-60 grayscale pointer-events-none{% endif %}">
                         {% if product.available_stock == 0 %}
                         <div class="absolute pointer-events-none bg-red-500/40 rotate-[-35deg] origin-center" style="height:3px;width:160%;top:50%;left:-30%;"></div>
                         {% endif %}
-                        <div class="w-20 h-20 lg:w-24 lg:h-24 mb-4 rounded-full overflow-hidden flex items-center justify-center bg-slate-50 shadow-inner group-hover:scale-110 transition-transform duration-300">
+                        <div class="w-14 h-14 md:w-20 md:h-20 lg:w-24 lg:h-24 mb-2 md:mb-4 rounded-full overflow-hidden flex items-center justify-center bg-slate-50 shadow-inner group-hover:scale-110 transition-transform duration-300">
                             {% if product.image %}
                             <img src="{{ product.image.url }}" alt="{{ product.name }}" class="w-full h-full object-cover" />
                             {% else %}
-                            <span class="text-4xl lg:text-5xl">{{ product.icon|default:"🍔" }}</span>
+                            <span class="text-3xl md:text-4xl lg:text-5xl">{{ product.icon|default:"🍔" }}</span>
                             {% endif %}
                         </div>
-                        <h4 class="font-bold text-slate-800 line-clamp-1 w-full text-sm">{{ product.name }}</h4>
-                        <p class="text-xs text-slate-400 mb-2">{{ product.category.name }}</p>
-                        <div class="flex items-center justify-between w-full mt-auto pt-3 border-t border-slate-50">
-                            <span class="text-sm font-black text-slate-800">R$ {{ product.price }}</span>
-                            <span class="text-[10px] font-bold px-2 py-1 rounded-full {% if product.available_stock <= 5 %}bg-red-100 text-red-600{% else %}bg-slate-100 text-slate-400{% endif %}">
+                        <h4 class="font-bold text-slate-800 line-clamp-2 w-full text-[11px] md:text-sm leading-tight">{{ product.name }}</h4>
+                        <p class="text-[10px] md:text-xs text-slate-400 mb-1 md:mb-2 line-clamp-1">{{ product.category.name }}</p>
+                        <div class="flex items-center justify-between w-full mt-auto pt-2 border-t border-slate-50">
+                            <span class="text-[11px] md:text-sm font-black text-slate-800">R$ {{ product.price }}</span>
+                            <span class="text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-full {% if product.available_stock <= 5 %}bg-red-100 text-red-600{% else %}bg-slate-100 text-slate-400{% endif %}">
                                 {{ product.available_stock }}
                             </span>
                         </div>
                         <button type="button"
                             data-product-id="{{ product.id }}"
                             onclick="handleCartAction('add', {{ product.id }}, this); return false;"
-                            class="mt-3 w-full py-2 rounded-xl text-xs font-bold uppercase tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition-all">
-                            Add Pedido
+                            class="mt-2 w-full py-1.5 md:py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition-all">
+                            Add
                         </button>
                     </div>
                     {% endfor %}
