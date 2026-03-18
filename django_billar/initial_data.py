@@ -18,7 +18,7 @@ print('✓ Configurações criadas')
 
 # Criar usuário gerente
 if not User.objects.filter(username='gerente').exists():
-    admin_password = os.getenv('BILLAR_INIT_ADMIN_PASSWORD', 'admin12345')
+    admin_password = os.getenv('BILLAR_INIT_ADMIN_PASSWORD', 'admin123')
     user = User.objects.create_user(
         username='gerente',
         password=admin_password,
@@ -72,4 +72,4 @@ print('✓ Produtos criados')
 print('\n🎉 Dados iniciais criados com sucesso!')
 print('   Acesse o sistema com:')
 print('   Usuário: gerente')
-print('   Senha: variável BILLAR_INIT_ADMIN_PASSWORD ou admin12345')
+print('   Senha: variável BILLAR_INIT_ADMIN_PASSWORD ou admin123')

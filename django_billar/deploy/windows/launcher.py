@@ -86,8 +86,20 @@ def main():
         from django.core.management import call_command
         try:
             call_command('migrate', verbosity=0)
+            call_command('ensure_initial_access', verbosity=0)
         except Exception as e:
             print(f'Aviso: migrate falhou - {e}')
+        
+        # Setup desktop shortcut modular (async, non-blocking)
+        try:
+            subprocess.Popen(
+                [PYTHON_EXE, str(BASE_DIR / 'deploy' / 'windows' / 'setup_desktop_shortcut.py')],
+                cwd=BASE_DIR,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        except Exception:
+            pass  # Falha silenciosa não impede inicialização
         
         # Inicia servidor Waitress (WSGI)
         import threading
@@ -119,6 +131,9 @@ def main():
     else:
         # Modo desenvolvimento - usa subprocessos
         run([PYTHON_EXE, 'manage.py', 'migrate'])
+        run([PYTHON_EXE, 'manage.py', 'ensure_initial_access'])
+        # Setup desktop shortcut modular (async)
+        subprocess.Popen([PYTHON_EXE, 'deploy/windows/setup_desktop_shortcut.py'], cwd=BASE_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         has_ssl = CERT_FILE.exists() and KEY_FILE.exists()
 
