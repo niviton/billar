@@ -310,12 +310,13 @@ def _render_professional_sales_pdf(export_rows, store_settings, period_label, su
         commands.append(f'{x1:.2f} {y1:.2f} m {x2:.2f} {y2:.2f} l S')
 
     table_cols = [
-        ('Data/Hora', 78, 16),
-        ('Cliente', 118, 24),
-        ('Tipo', 66, 14),
-        ('Garcom', 72, 14),
-        ('Itens', 132, 30),
-        ('Total', 62, 12),
+        ('Data/Hora', 70, 16),
+        ('Cliente', 100, 24),
+        ('Tipo', 52, 14),
+        ('Garcom', 60, 14),
+        ('Pagto', 50, 12),
+        ('Itens', 110, 30),
+        ('Total', 53, 12),
     ]
 
     pages_commands = []
@@ -390,12 +391,13 @@ def _render_professional_sales_pdf(export_rows, store_settings, period_label, su
             _truncate_pdf(row['name'], table_cols[1][2]),
             _truncate_pdf(row['order_type'], table_cols[2][2]),
             _truncate_pdf(row['waiter'], table_cols[3][2]),
-            _truncate_pdf(row['items'], table_cols[4][2]),
-            _truncate_pdf(f"R$ {row['total']}", table_cols[5][2]),
+            _truncate_pdf(row['payment'], table_cols[4][2]),
+            _truncate_pdf(row['items'], table_cols[5][2]),
+            _truncate_pdf(f"R$ {row['total']}", table_cols[6][2]),
         ]
 
         for idx, cell_value in enumerate(row_values):
-            font_name = 'F2' if idx == 5 else 'F1'
+            font_name = 'F2' if idx == 6 else 'F1'
             text_cmd(current_commands, x_cursor, y_cursor, cell_value, font=font_name, size=8)
             x_cursor += table_cols[idx][1]
 
@@ -1158,35 +1160,22 @@ def change_order_item_qty(request, order_id, item_id):
         order_item.save(update_fields=['quantity', 'pending_quantity'])
 
     elif action == 'remove':
-        if order_item.pending_quantity <= 0:
-            if is_ajax_request(request):
-                return JsonResponse({'success': False, 'message': 'Este item já está em preparo ou pronto e não pode ser cancelado.'}, status=400)
-            messages.error(request, 'Este item já está em preparo ou pronto e não pode ser cancelado.')
-            return redirect('manage_order', order_id=order.id)
-
         order_item.quantity -= 1
-        order_item.pending_quantity -= 1
-        product.restore_ingredients(1)
+        if order_item.pending_quantity > 0:
+            order_item.pending_quantity -= 1
+            # Reverte estoque apenas da parte que ainda nao foi produzida.
+            product.restore_ingredients(1)
         if order_item.quantity <= 0:
             order_item.delete()
         else:
             order_item.save(update_fields=['quantity', 'pending_quantity'])
 
     elif action == 'delete':
-        if order_item.pending_quantity <= 0:
-            if is_ajax_request(request):
-                return JsonResponse({'success': False, 'message': 'Não há quantidade pendente para cancelar neste item.'}, status=400)
-            messages.error(request, 'Não há quantidade pendente para cancelar neste item.')
-            return redirect('manage_order', order_id=order.id)
-
         pending_to_cancel = order_item.pending_quantity
-        product.restore_ingredients(pending_to_cancel)
-        order_item.quantity -= pending_to_cancel
-        order_item.pending_quantity = 0
-        if order_item.quantity <= 0:
-            order_item.delete()
-        else:
-            order_item.save(update_fields=['quantity', 'pending_quantity'])
+        if pending_to_cancel > 0:
+            # Reverte apenas unidades que ainda estavam pendentes.
+            product.restore_ingredients(pending_to_cancel)
+        order_item.delete()
 
     else:
         if is_ajax_request(request):
@@ -1354,7 +1343,10 @@ def admin_reports(request):
     if page_size not in page_size_options:
         page_size = 15
 
+    # Estatisticas financeiras consideram apenas pedidos finalizados.
     orders = Order.objects.filter(status='finalizado')
+    # Historico de pedidos mostra finalizados e cancelados no mesmo lugar.
+    history_orders = Order.objects.filter(status__in=['finalizado', 'cancelado'])
 
     if filter_type == 'day':
         try:
@@ -1364,6 +1356,7 @@ def admin_reports(request):
             target_day = today
             selected_day = today.strftime('%Y-%m-%d')
         orders = orders.filter(created_at__date=target_day)
+        history_orders = history_orders.filter(created_at__date=target_day)
 
     elif filter_type == 'month':
         try:
@@ -1379,6 +1372,7 @@ def admin_reports(request):
             next_month = date(start_month.year, start_month.month + 1, 1)
 
         orders = orders.filter(created_at__date__gte=start_month, created_at__date__lt=next_month)
+        history_orders = history_orders.filter(created_at__date__gte=start_month, created_at__date__lt=next_month)
 
     elif filter_type == 'year':
         try:
@@ -1387,6 +1381,7 @@ def admin_reports(request):
             target_year = today.year
             selected_year = str(today.year)
         orders = orders.filter(created_at__year=target_year)
+        history_orders = history_orders.filter(created_at__year=target_year)
 
     elif filter_type == 'range':
         default_start = today - timedelta(days=6)
@@ -1410,10 +1405,12 @@ def admin_reports(request):
             selected_end_date = end_date.strftime('%Y-%m-%d')
 
         orders = orders.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+        history_orders = history_orders.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
 
     else:
         filter_type = 'day'
         orders = orders.filter(created_at__date=today)
+        history_orders = history_orders.filter(created_at__date=today)
         selected_day = today.strftime('%Y-%m-%d')
     
     # Estatísticas
@@ -1455,7 +1452,31 @@ def admin_reports(request):
         order__in=orders
     ).aggregate(total=Sum('quantity'))['total'] or 0
     
-    sales_history_qs = orders.select_related('waiter').prefetch_related('items__product').order_by('-created_at')
+    # Totais agrupados por tipo de pagamento (apenas finalizados)
+    payment_summary = orders.values('payment_method').annotate(
+        total=Sum('total'),
+        count=Count('id')
+    ).order_by('-total')
+    
+    # Formatar labels de pagamento
+    payment_labels = {
+        'dinheiro': 'Dinheiro',
+        'pix': 'PIX',
+        'credito': 'Cartão de Crédito',
+        'debito': 'Cartão de Débito',
+        '': 'Não definido',
+    }
+    
+    payment_summary_formatted = []
+    for payment in payment_summary:
+        method = payment['payment_method'] or ''
+        payment_summary_formatted.append({
+            'method': payment_labels.get(method, method),
+            'total': payment['total'],
+            'count': payment['count'],
+        })
+    
+    sales_history_qs = history_orders.select_related('waiter').prefetch_related('items__product').order_by('-created_at')
 
     if history_search:
         sales_history_qs = sales_history_qs.filter(cliente__icontains=history_search)
@@ -1563,6 +1584,7 @@ def admin_reports(request):
         'top_products': top_products,
         'product_quantities': product_quantities,
         'total_items_sold': total_items_sold,
+        'payment_summary': payment_summary_formatted,
         'sales_history': sales_history_page,
         'history_search': history_search,
         'history_total': sales_history_qs.count(),

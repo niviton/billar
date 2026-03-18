@@ -176,6 +176,48 @@
             </div>
         </div>
     </div>
+    
+    <!-- Resumo por Tipo de Pagamento -->
+    <div class="mt-8 bg-[var(--admin-card)] rounded-3xl p-6 border border-[var(--admin-line)] shadow-[0_20px_50px_-36px_rgba(66,47,28,0.55)]">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <i class="bi bi-credit-card text-blue-600"></i>
+                </div>
+                <h2 class="admin-brand-title text-2xl text-[var(--admin-text)]">Total Por Metodo de Pagamento</h2>
+            </div>
+            
+            <div class="space-y-4">
+                {% for payment in payment_summary %}
+                <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl">
+                    <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-xl shadow-sm">
+                        {% if 'PIX' in payment.method %}
+                            💳
+                        {% elif 'Dinheiro' in payment.method %}
+                            💵
+                        {% elif 'Cartao' in payment.method or 'Crédito' in payment.method %}
+                            🏦
+                        {% elif 'Débito' in payment.method %}
+                            🏧
+                        {% else %}
+                            ❓
+                        {% endif %}
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-bold text-slate-800">{{ payment.method }}</p>
+                        <p class="text-sm text-slate-400">{{ payment.count }} pedido{% if payment.count != 1 %}s{% endif %}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-black text-slate-800">R$ {{ payment.total|floatformat:2 }}</p>
+                        <p class="text-xs text-slate-500">{{ payment.count }} pedido{% if payment.count != 1 %}s{% endif %}</p>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-8">
+                    <p class="text-slate-400">Nenhum pagamento registrado</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
 
     <div class="mt-8 bg-[var(--admin-card)] rounded-3xl p-6 border border-[var(--admin-line)] shadow-[0_20px_50px_-36px_rgba(66,47,28,0.55)]">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
@@ -227,7 +269,7 @@
                 </div>
                 <div>
                     <h2 class="admin-brand-title text-2xl text-[var(--admin-text)]">Historico de Vendas</h2>
-                    <p class="text-xs text-slate-400">Pedidos finalizados no periodo selecionado</p>
+                    <p class="text-xs text-slate-400">Pedidos fechados e cancelados no periodo selecionado</p>
                 </div>
             </div>
             <span class="text-xs font-bold uppercase tracking-wider text-slate-400">{{ history_total }} registros</span>
@@ -290,6 +332,7 @@
                         <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Data</th>
                         <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Nome</th>
                         <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">O que foi vendido</th>
+                        <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Pagamento</th>
                         <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Valor</th>
                         <th class="px-4 py-3 font-bold uppercase tracking-wide text-[11px]">Nota</th>
                     </tr>
@@ -311,6 +354,9 @@
                                     Mesa {{ order.mesa }}
                                 {% endif %}
                             </p>
+                            <span class="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold {% if order.status == 'cancelado' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                {{ order.get_status_display }}
+                            </span>
                             <p class="text-xs text-slate-400">
                                 {% if order.order_type == 'delivery' %}
                                     Delivery
@@ -330,6 +376,15 @@
                                 {% endfor %}
                             </div>
                         </td>
+                        <td class="px-4 py-3 text-slate-700 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700">
+                                {% if order.payment_method %}
+                                    {{ order.get_payment_method_display }}
+                                {% else %}
+                                    <span class="text-slate-400">Não definido</span>
+                                {% endif %}
+                            </span>
+                        </td>
                         <td class="px-4 py-3 text-slate-800 font-black whitespace-nowrap">R$ {{ order.total|floatformat:2 }}</td>
                         <td class="px-4 py-3 whitespace-nowrap">
                             <a href="{% url 'print_order' order.id %}" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-700 transition-colors">
@@ -340,7 +395,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="px-4 py-10 text-center text-slate-400 font-medium">Nenhuma venda finalizada no periodo selecionado.</td>
+                        <td colspan="6" class="px-4 py-10 text-center text-slate-400 font-medium">Nenhum pedido fechado ou cancelado no periodo selecionado.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

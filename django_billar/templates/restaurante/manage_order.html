@@ -44,9 +44,9 @@
                         </div>
                         <div class="flex items-center justify-between mt-4 pt-3 border-t border-slate-200">
                             <div class="flex items-center gap-3">
-                                <button type="button" data-item-id="{{ item.id }}" data-item-action="remove" title="Cancelar 1 unidade pendente"
-                                        class="w-12 h-12 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all touch-manipulation active:scale-95">
-                                    <i class="bi bi-dash-lg text-xl"></i>
+                                <button type="button" data-item-id="{{ item.id }}" data-item-action="remove" title="Cancelar 1 unidade, mesmo se ja estiver pronta"
+                                        class="h-12 px-3 rounded-xl bg-red-100 text-red-700 flex items-center justify-center hover:bg-red-200 transition-all touch-manipulation active:scale-95 text-xs font-bold uppercase tracking-wide">
+                                    Cancelar 1
                                 </button>
                                 <span class="w-10 text-center font-black text-slate-800 text-xl">{{ item.quantity }}</span>
                                 <button type="button" data-item-id="{{ item.id }}" data-item-action="add" 
@@ -56,6 +56,7 @@
                             </div>
                             <span class="font-bold text-slate-800 text-lg">R$ {{ item.subtotal|floatformat:2 }}</span>
                         </div>
+                        <p class="text-[11px] text-slate-500 mt-2">Use "Cancelar 1" para remover uma unidade mesmo se ja estiver pronta.</p>
                     </div>
                     {% empty %}
                     <p class="text-slate-400 text-center py-8">Nenhum item no pedido.</p>
@@ -184,9 +185,9 @@ function renderManageOrderItems(order) {
                 </div>
                 <div class="flex items-center justify-between mt-4 pt-3 border-t border-slate-200">
                     <div class="flex items-center gap-3">
-                        <button type="button" data-item-id="${item.id}" data-item-action="remove" title="Cancelar 1 unidade pendente"
-                                class="w-12 h-12 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all touch-manipulation active:scale-95">
-                            <i class="bi bi-dash-lg text-xl"></i>
+                        <button type="button" data-item-id="${item.id}" data-item-action="remove" title="Cancelar 1 unidade, mesmo se ja estiver pronta"
+                                class="h-12 px-3 rounded-xl bg-red-100 text-red-700 flex items-center justify-center hover:bg-red-200 transition-all touch-manipulation active:scale-95 text-xs font-bold uppercase tracking-wide">
+                            Cancelar 1
                         </button>
                         <span class="w-10 text-center font-black text-slate-800 text-xl">${item.quantity}</span>
                         <button type="button" data-item-id="${item.id}" data-item-action="add" 
@@ -197,6 +198,7 @@ function renderManageOrderItems(order) {
                     <span class="font-bold text-slate-800 text-lg">R$ ${Number(item.subtotal).toFixed(2)}</span>
                 </div>
                 <p class="text-xs text-amber-600 font-semibold mt-2">Pendente para cozinha: ${item.pending_quantity}</p>
+                <p class="text-[11px] text-slate-500 mt-1">Use "Cancelar 1" para remover uma unidade mesmo se ja estiver pronta.</p>
             </div>
         `;
     }).join('');
@@ -270,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const itemId = itemActionBtn.dataset.itemId;
             const action = itemActionBtn.dataset.itemAction;
             if (action === 'delete') {
-                const confirmed = await showConfirmModal('Cancelar todas as unidades pendentes deste item?', 'Cancelar Item');
+                const confirmed = await showConfirmModal('Cancelar este item por completo, inclusive unidades prontas?', 'Cancelar Item');
                 if (!confirmed) {
                     return;
                 }
