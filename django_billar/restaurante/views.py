@@ -15,7 +15,7 @@ from django.core.validators import validate_slug
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
-from datetime import timedelta, date
+from datetime import timedelta, date, datetime, time
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 import io
@@ -1264,11 +1264,14 @@ def admin_dashboard(request):
         messages.error(request, 'Acesso não autorizado')
         return redirect('dashboard')
     
-    today = timezone.now().date()
+    local_now = timezone.localtime()
+    day_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + timedelta(days=1)
     
     # Estatísticas do dia
     orders_today = Order.objects.filter(
-        created_at__date=today,
+        created_at__gte=day_start,
+        created_at__lt=day_end,
         status='finalizado'
     )
     
@@ -1299,7 +1302,8 @@ def admin_dashboard(request):
     
     # Top 5 produtos
     top_products = OrderItem.objects.filter(
-        order__created_at__date=today,
+        order__created_at__gte=day_start,
+        order__created_at__lt=day_end,
         order__status='finalizado'
     ).values('product__name').annotate(
         total_qty=Sum('quantity')
@@ -1355,8 +1359,11 @@ def admin_reports(request):
         except (TypeError, ValueError):
             target_day = today
             selected_day = today.strftime('%Y-%m-%d')
-        orders = orders.filter(created_at__date=target_day)
-        history_orders = history_orders.filter(created_at__date=target_day)
+
+        period_start = timezone.make_aware(datetime.combine(target_day, time.min))
+        period_end = period_start + timedelta(days=1)
+        orders = orders.filter(created_at__gte=period_start, created_at__lt=period_end)
+        history_orders = history_orders.filter(created_at__gte=period_start, created_at__lt=period_end)
 
     elif filter_type == 'month':
         try:
@@ -1371,8 +1378,10 @@ def admin_reports(request):
         else:
             next_month = date(start_month.year, start_month.month + 1, 1)
 
-        orders = orders.filter(created_at__date__gte=start_month, created_at__date__lt=next_month)
-        history_orders = history_orders.filter(created_at__date__gte=start_month, created_at__date__lt=next_month)
+        period_start = timezone.make_aware(datetime.combine(start_month, time.min))
+        period_end = timezone.make_aware(datetime.combine(next_month, time.min))
+        orders = orders.filter(created_at__gte=period_start, created_at__lt=period_end)
+        history_orders = history_orders.filter(created_at__gte=period_start, created_at__lt=period_end)
 
     elif filter_type == 'year':
         try:
@@ -1380,8 +1389,12 @@ def admin_reports(request):
         except (TypeError, ValueError):
             target_year = today.year
             selected_year = str(today.year)
-        orders = orders.filter(created_at__year=target_year)
-        history_orders = history_orders.filter(created_at__year=target_year)
+        start_year = date(target_year, 1, 1)
+        next_year = date(target_year + 1, 1, 1)
+        period_start = timezone.make_aware(datetime.combine(start_year, time.min))
+        period_end = timezone.make_aware(datetime.combine(next_year, time.min))
+        orders = orders.filter(created_at__gte=period_start, created_at__lt=period_end)
+        history_orders = history_orders.filter(created_at__gte=period_start, created_at__lt=period_end)
 
     elif filter_type == 'range':
         default_start = today - timedelta(days=6)
@@ -1404,13 +1417,17 @@ def admin_reports(request):
             selected_start_date = start_date.strftime('%Y-%m-%d')
             selected_end_date = end_date.strftime('%Y-%m-%d')
 
-        orders = orders.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-        history_orders = history_orders.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+        period_start = timezone.make_aware(datetime.combine(start_date, time.min))
+        period_end = timezone.make_aware(datetime.combine(end_date + timedelta(days=1), time.min))
+        orders = orders.filter(created_at__gte=period_start, created_at__lt=period_end)
+        history_orders = history_orders.filter(created_at__gte=period_start, created_at__lt=period_end)
 
     else:
         filter_type = 'day'
-        orders = orders.filter(created_at__date=today)
-        history_orders = history_orders.filter(created_at__date=today)
+        period_start = timezone.make_aware(datetime.combine(today, time.min))
+        period_end = period_start + timedelta(days=1)
+        orders = orders.filter(created_at__gte=period_start, created_at__lt=period_end)
+        history_orders = history_orders.filter(created_at__gte=period_start, created_at__lt=period_end)
         selected_day = today.strftime('%Y-%m-%d')
     
     # Estatísticas

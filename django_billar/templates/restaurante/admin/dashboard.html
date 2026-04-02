@@ -158,6 +158,16 @@ let adminDashboardSocket = null;
 let adminReconnectTimeout = null;
 let adminReconnectAttempts = 0;
 const adminMaxReconnectAttempts = 5;
+let adminDisableWebSocket = false;
+let adminPollingStarted = false;
+
+function startAdminPolling() {
+    if (adminPollingStarted) {
+        return;
+    }
+    adminPollingStarted = true;
+    setInterval(fetchDashboardData, 3000);
+}
 
 function updateConnectionStatus(status, message, icon) {
     return;
@@ -262,6 +272,11 @@ async function fetchDashboardData() {
 }
 
 function connectAdminDashboardSocket() {
+    if (adminDisableWebSocket) {
+        startAdminPolling();
+        return;
+    }
+
     if (adminDashboardSocket && adminDashboardSocket.readyState === WebSocket.OPEN) {
         return;
     }
@@ -318,23 +333,17 @@ function connectAdminDashboardSocket() {
         adminDashboardSocket.onclose = function(e) {
             console.log('Dashboard WebSocket closed:', e.code, e.reason);
             adminDashboardSocket = null;
-            
-            if (adminReconnectAttempts < 3) {
-                // Tenta reconectar via WebSocket
-                adminReconnectAttempts++;
-                const delay = Math.min(1000 * Math.pow(2, adminReconnectAttempts), 10000);
-                adminReconnectTimeout = setTimeout(connectAdminDashboardSocket, delay);
-            } else {
-                // Fallback para polling HTTP
-                console.log('WebSocket indisponível, usando polling HTTP');
-                setInterval(fetchDashboardData, 3000);
-            }
+
+            // Evita spam de tentativas quando o endpoint WebSocket nao existe no servidor atual.
+            adminDisableWebSocket = true;
+            updateConnectionStatus('error', 'Tempo real indisponível. Usando atualização automática.', '⚠️');
+            startAdminPolling();
         };
         
     } catch (error) {
         console.error('Error creating dashboard WebSocket:', error);
-        // Fallback para polling HTTP
-        setInterval(fetchDashboardData, 3000);
+        adminDisableWebSocket = true;
+        startAdminPolling();
     }
 }
 

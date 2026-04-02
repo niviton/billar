@@ -258,6 +258,52 @@ Saída esperada:
 
 ## 📡 Recursos em Tempo Real
 
+## 🛡️ Banco Seguro Por Anos (recomendado)
+
+Para durabilidade real de longo prazo, siga esta ordem:
+
+1. Use PostgreSQL em produção sempre que possível (`DB_ENGINE=postgres`).
+2. Tenha backups automáticos frequentes com retenção.
+3. Mantenha uma cópia fora da máquina principal (outro disco/servidor/nuvem).
+4. Teste restauração periodicamente (não basta só gerar backup).
+
+### Backup para PostgreSQL
+
+Scripts prontos:
+
+- `deploy/windows/backup_postgres.ps1`
+- `deploy/windows/schedule_db_backup_task.ps1`
+
+Exemplo de agendamento:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy/windows/schedule_db_backup_task.ps1 -EveryMinutes 30
+```
+
+### Backup para SQLite
+
+Se ainda estiver usando SQLite, agora há script dedicado com cópia consistente e checksum SHA-256:
+
+- `deploy/windows/backup_sqlite.ps1`
+- `deploy/windows/schedule_sqlite_backup_task.ps1`
+
+Exemplo de execução manual:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy/windows/backup_sqlite.ps1
+```
+
+Exemplo de agendamento:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy/windows/schedule_sqlite_backup_task.ps1 -EveryMinutes 30
+```
+
+### Observação de segurança importante
+
+O script `deploy/windows/auto_backup_git_push.ps1` foi ajustado para **não** commitar o banco vivo por padrão.
+Isso reduz risco de exposição de dados sensíveis no histórico Git.
+
 O sistema implementa WebSocket para atualizações em tempo real em todas as telas principais.
 
 **Páginas com atualização automática:**
@@ -301,8 +347,18 @@ Nos celulares, abra o sistema e use **Adicionar à tela inicial**.
 - `DJANGO_DEBUG=false` em produção
 - `DJANGO_SECRET_KEY` forte
 - `DJANGO_ALLOWED_HOSTS` restrito ao IP/hostname LAN
+- `DJANGO_CSRF_TRUSTED_ORIGINS` definido com URLs HTTPS reais de produção
+- `AUTO_ALLOW_LOCAL_HOSTS=false` em produção
 - Usuários separados por função e senhas fortes
 - Rede operacional separada da rede de clientes
+
+Validação rápida de hardening:
+
+```bash
+python manage.py security_audit
+```
+
+O comando executa `check --deploy` do Django e validações adicionais do projeto.
 
 ## 💾 Backup automático
 

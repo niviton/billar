@@ -42,6 +42,8 @@ if not DEBUG and SECRET_KEY == DEFAULT_SECRET_KEY:
 raw_allowed_hosts = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').strip()
 ALLOWED_HOSTS = [host.strip() for host in raw_allowed_hosts.split(',') if host.strip()]
 
+AUTO_ALLOW_LOCAL_HOSTS = env_bool('AUTO_ALLOW_LOCAL_HOSTS', DEBUG)
+
 
 def split_csv_env(name):
     raw = os.getenv(name, '').strip()
@@ -59,11 +61,11 @@ def get_local_ip():
         return None
 
 local_ip = get_local_ip()
-if local_ip and local_ip not in ALLOWED_HOSTS:
+if AUTO_ALLOW_LOCAL_HOSTS and local_ip and local_ip not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(local_ip)
 
 machine_name = socket.gethostname().strip().lower()
-if machine_name and machine_name not in ALLOWED_HOSTS:
+if AUTO_ALLOW_LOCAL_HOSTS and machine_name and machine_name not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(machine_name)
 
 # Aceita qualquer IP local em modo executável (para facilitar acesso em rede)
@@ -74,18 +76,20 @@ ENABLE_REALTIME = os.getenv('ENABLE_REALTIME', 'true').strip().lower() == 'true'
 
 # Em desenvolvimento (localhost + Codespaces), aceitar variações de host/porta
 # evita falhas intermitentes de CSRF no login e nos POSTs AJAX.
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost',
-    'https://localhost',
-    'http://127.0.0.1',
-    'https://127.0.0.1',
-    'http://localhost:8000',
-    'https://localhost:8000',
-    'http://127.0.0.1:8000',
-    'https://127.0.0.1:8000',
-    'https://*.app.github.dev',
-    'https://*.githubpreview.dev',
-]
+CSRF_TRUSTED_ORIGINS = []
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS.extend([
+        'http://localhost',
+        'https://localhost',
+        'http://127.0.0.1',
+        'https://127.0.0.1',
+        'http://localhost:8000',
+        'https://localhost:8000',
+        'http://127.0.0.1:8000',
+        'https://127.0.0.1:8000',
+        'https://*.app.github.dev',
+        'https://*.githubpreview.dev',
+    ])
 
 CSRF_TRUSTED_ORIGINS.extend(split_csv_env('DJANGO_CSRF_TRUSTED_ORIGINS'))
 
@@ -125,17 +129,33 @@ if os.getenv('CODESPACES', '').lower() == 'true':
     CSRF_COOKIE_SECURE = False
     SESSION_COOKIE_SECURE = False
 
+if env_bool('TRUST_X_FORWARDED_PROTO', False):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+if env_bool('USE_X_FORWARDED_HOST', False):
+    USE_X_FORWARDED_HOST = True
+
 if not DEBUG:
     SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', True)
     SESSION_COOKIE_SECURE = env_bool('SESSION_COOKIE_SECURE', True)
     CSRF_COOKIE_SECURE = env_bool('CSRF_COOKIE_SECURE', True)
     SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '31536000'))
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', True)
+    SECURE_HSTS_PRELOAD = env_bool('SECURE_HSTS_PRELOAD', True)
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
     SECURE_REFERRER_POLICY = 'same-origin'
     SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
+
+if not DEBUG:
+    if SECRET_KEY == DEFAULT_SECRET_KEY:
+        raise ImproperlyConfigured('Defina DJANGO_SECRET_KEY com um valor forte em produção.')
+    if not ALLOWED_HOSTS:
+        raise ImproperlyConfigured('Defina DJANGO_ALLOWED_HOSTS em produção.')
+    if '*' in ALLOWED_HOSTS:
+        raise ImproperlyConfigured('Nao use "*" em DJANGO_ALLOWED_HOSTS em produção.')
+    if not CSRF_TRUSTED_ORIGINS:
+        raise ImproperlyConfigured('Defina DJANGO_CSRF_TRUSTED_ORIGINS em produção.')
 
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'

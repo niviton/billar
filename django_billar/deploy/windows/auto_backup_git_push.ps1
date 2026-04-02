@@ -3,7 +3,7 @@ param(
   [string]$DbPath = "",
   [string]$BackupDir = "",
   [int]$KeepCount = 40,
-  [switch]$IncludeLiveDb = $true,
+  [switch]$IncludeLiveDb,
   [string]$RemoteName = "origin",
   [string]$Branch = "",
   [string]$CommitPrefix = "chore: backup automatico do banco"
@@ -17,7 +17,7 @@ function Write-Log {
   "$stamp | $Message" | Tee-Object -FilePath $script:LogFile -Append
 }
 
-function To-RelativePath {
+function Get-RelativePath {
   param(
     [Parameter(Mandatory = $true)][string]$BasePath,
     [Parameter(Mandatory = $true)][string]$TargetPath
@@ -89,13 +89,15 @@ if ($oldBackups) {
   Write-Log "Backups antigos removidos: $($oldBackups.Count)"
 }
 
-$relativeSnapshot = To-RelativePath -BasePath $RepoRoot -TargetPath $snapshot
-$relativeLatest = To-RelativePath -BasePath $RepoRoot -TargetPath $latest
+$relativeSnapshot = Get-RelativePath -BasePath $RepoRoot -TargetPath $snapshot
+$relativeLatest = Get-RelativePath -BasePath $RepoRoot -TargetPath $latest
 
 if ($IncludeLiveDb) {
-  $relativeDb = To-RelativePath -BasePath $RepoRoot -TargetPath $DbPath
+  $relativeDb = Get-RelativePath -BasePath $RepoRoot -TargetPath $DbPath
   git -C $RepoRoot add -f -- "$relativeDb"
   Write-Log "Arquivo do banco adicionado ao commit: $relativeDb"
+} else {
+  Write-Log "Banco vivo NAO sera commitado (IncludeLiveDb desativado)."
 }
 
 git -C $RepoRoot add -- "$relativeSnapshot" "$relativeLatest"
